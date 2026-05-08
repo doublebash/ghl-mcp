@@ -1,0 +1,14 @@
+name = "ghl-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Non-secret config can go here later
+
+# Secrets stored via wrangler secret put:
+# GHL_API_TOKEN, GHL_LOCATION_ID, GHL_USER_ID, GHL_CALENDAR_ID, MCP_AUTH_TOKEN
+
+[[kv_namespaces]]
+binding = "GHL_OAUTH_KV"
+id = "1a02a7cf4c244b3caf2d12ae2b665252"
