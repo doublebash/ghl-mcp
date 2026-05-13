@@ -349,7 +349,11 @@ export const toolDefinitions = [
           enum: ["open", "won", "lost", "abandoned"],
           description: "Opportunity status. Defaults to 'open'.",
         },
-        assignedTo: { type: "string" as const, description: "Optional. GHL user ID to assign this opportunity to." },
+        assignedTo: {
+          type: "string" as const,
+          description:
+            "Optional. Assign the opportunity to a GHL user. Pass a GHL user ID, or pass 'me' to assign it to yourself (the account this server is configured with).",
+        },
       },
       required: ["name", "pipelineId", "stageId", "contactId"],
     },
@@ -372,7 +376,11 @@ export const toolDefinitions = [
           description: "Updated opportunity status.",
         },
         monetaryValue: { type: "number" as const, description: "Updated deal value in dollars." },
-        assignedTo: { type: "string" as const, description: "Updated assigned GHL user ID." },
+        assignedTo: {
+          type: "string" as const,
+          description:
+            "Reassign the opportunity to a GHL user. Pass a GHL user ID, or pass 'me' to assign it to yourself (the account this server is configured with).",
+        },
       },
       required: ["opportunityId"],
     },

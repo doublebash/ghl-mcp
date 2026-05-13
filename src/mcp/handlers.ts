@@ -50,7 +50,7 @@ export async function handleToolCall(
         contactId: args["contactId"] as string,
         monetaryValue: args["monetaryValue"] as number | undefined,
         status: args["status"] as "open" | "won" | "lost" | "abandoned" | undefined,
-        assignedTo: args["assignedTo"] as string | undefined,
+        assignedTo: resolveAssignedTo(env, args["assignedTo"]),
       });
     }
 
@@ -60,7 +60,7 @@ export async function handleToolCall(
         stageId: args["stageId"] as string | undefined,
         status: args["status"] as "open" | "won" | "lost" | "abandoned" | undefined,
         monetaryValue: args["monetaryValue"] as number | undefined,
-        assignedTo: args["assignedTo"] as string | undefined,
+        assignedTo: resolveAssignedTo(env, args["assignedTo"]),
       });
     }
 
