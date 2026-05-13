@@ -254,11 +254,56 @@ export const toolDefinitions = [
     },
   },
   {
+    name: "list_notes",
+    description:
+      "List all notes on a GoHighLevel contact record, each with its note ID, body, author, and timestamp. " +
+      "Use this to review what's already been logged about a contact, or to find a note's ID before editing or deleting it with update_note / delete_note. " +
+      "Requires a contact ID — run search_contacts first if you only have a name.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        contactId: { type: "string" as const, description: "The GHL contact ID to list notes for." },
+      },
+      required: ["contactId"],
+    },
+  },
+  {
+    name: "update_note",
+    description:
+      "Replace the body of an existing note on a GoHighLevel contact. " +
+      "Use this to correct or expand a note you previously logged. " +
+      "Run list_notes first to get the note ID. Requires a contact ID, note ID, and the new body text.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        contactId: { type: "string" as const, description: "The GHL contact ID the note belongs to." },
+        noteId: { type: "string" as const, description: "The GHL note ID to update (from list_notes)." },
+        body: { type: "string" as const, description: "The new note content — this replaces the existing body entirely." },
+      },
+      required: ["contactId", "noteId", "body"],
+    },
+  },
+  {
+    name: "delete_note",
+    description:
+      "Delete a note from a GoHighLevel contact record. " +
+      "Use this to remove a note that was logged in error. This cannot be undone. " +
+      "Run list_notes first to get the note ID. Requires a contact ID and note ID.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        contactId: { type: "string" as const, description: "The GHL contact ID the note belongs to." },
+        noteId: { type: "string" as const, description: "The GHL note ID to delete (from list_notes)." },
+      },
+      required: ["contactId", "noteId"],
+    },
+  },
+  {
     name: "update_contact",
     description:
       "Update an existing GoHighLevel contact's details. " +
       "Only the fields you provide will be changed — omitted fields are left as-is. " +
-      "Use this to correct information, add a phone number, update a company name, or change custom fields. " +
+      "Use this to correct information, add a phone number, update a company name, change custom fields, or assign the contact to a user. " +
       "Requires a contact ID — run search_contacts first if you only have a name.",
     inputSchema: {
       type: "object" as const,
@@ -274,6 +319,11 @@ export const toolDefinitions = [
           type: "array" as const,
           items: { type: "string" as const },
           description: "Replace the contact's tags with this list.",
+        },
+        assignedTo: {
+          type: "string" as const,
+          description:
+            "Assign the contact to a GHL user. Pass a GHL user ID, or pass 'me' to assign it to yourself (the account this server is configured with).",
         },
       },
       required: ["contactId"],
@@ -346,6 +396,11 @@ export const toolDefinitions = [
           type: "array" as const,
           items: { type: "string" as const },
           description: "Tags to apply to the contact on creation, e.g. ['real estate agent', 'auckland'].",
+        },
+        assignedTo: {
+          type: "string" as const,
+          description:
+            "Assign the new contact to a GHL user. Pass a GHL user ID, or pass 'me' to assign it to yourself (the account this server is configured with).",
         },
       },
       required: [],

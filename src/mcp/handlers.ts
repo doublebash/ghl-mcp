@@ -1,9 +1,18 @@
 import { GHLEnv } from "../ghl/client.js";
-import { searchContacts, getContact, createContact, updateContact, addNote, addTask, addTag } from "../ghl/contacts.js";
+import { searchContacts, getContact, createContact, updateContact, addNote, listNotes, updateNote, deleteNote, addTask, addTag } from "../ghl/contacts.js";
 import { getOpportunities, getOpportunity, createOpportunity, updateOpportunity, getPipelines } from "../ghl/opportunities.js";
 import { getConversationHistory } from "../ghl/conversations.js";
 import { getUpcomingAppointments, addAppointment } from "../ghl/calendar.js";
 import { listWorkflows, triggerWorkflow } from "../ghl/workflows.js";
+
+// Resolve an `assignedTo` argument: 'me' (or empty) maps to the configured GHL user,
+// anything else is treated as a raw GHL user ID.
+function resolveAssignedTo(env: GHLEnv, value: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const v = String(value).trim();
+  if (v.toLowerCase() === "me") return env.GHL_USER_ID;
+  return v;
+}
 
 export async function handleToolCall(
   env: GHLEnv,
@@ -120,6 +129,27 @@ export async function handleToolCall(
       return addNote(env, contactId, body);
     }
 
+    case "list_notes": {
+      return listNotes(env, args["contactId"] as string);
+    }
+
+    case "update_note": {
+      return updateNote(
+        env,
+        args["contactId"] as string,
+        args["noteId"] as string,
+        args["body"] as string
+      );
+    }
+
+    case "delete_note": {
+      return deleteNote(
+        env,
+        args["contactId"] as string,
+        args["noteId"] as string
+      );
+    }
+
     case "update_contact": {
       const contactId = args["contactId"] as string;
       return updateContact(env, contactId, {
@@ -130,6 +160,7 @@ export async function handleToolCall(
         companyName: args["companyName"] as string | undefined,
         source: args["source"] as string | undefined,
         tags: args["tags"] as string[] | undefined,
+        assignedTo: resolveAssignedTo(env, args["assignedTo"]),
       });
     }
 
@@ -142,6 +173,7 @@ export async function handleToolCall(
         companyName: args["companyName"] as string | undefined,
         source: args["source"] as string | undefined,
         tags: args["tags"] as string[] | undefined,
+        assignedTo: resolveAssignedTo(env, args["assignedTo"]),
       });
     }
 

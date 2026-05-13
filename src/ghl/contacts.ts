@@ -81,6 +81,39 @@ export async function addNote(
   return data.note ?? data;
 }
 
+export async function listNotes(
+  env: GHLEnv,
+  contactId: string
+): Promise<unknown> {
+  const data = await ghlRequest(env, "GET", `/contacts/${contactId}/notes`) as {
+    notes?: unknown;
+  };
+
+  return data.notes ?? data;
+}
+
+export async function updateNote(
+  env: GHLEnv,
+  contactId: string,
+  noteId: string,
+  body: string
+): Promise<unknown> {
+  const data = await ghlRequest(env, "PUT", `/contacts/${contactId}/notes/${noteId}`, {
+    body,
+    userId: env.GHL_USER_ID,
+  }) as { note?: unknown };
+
+  return data.note ?? data;
+}
+
+export async function deleteNote(
+  env: GHLEnv,
+  contactId: string,
+  noteId: string
+): Promise<unknown> {
+  return ghlRequest(env, "DELETE", `/contacts/${contactId}/notes/${noteId}`);
+}
+
 export async function updateContact(
   env: GHLEnv,
   contactId: string,
@@ -102,6 +135,7 @@ export interface CreateContactInput {
   companyName?: string;
   source?: string;
   tags?: string[];
+  assignedTo?: string;
   customFields?: { id: string; field_value: string }[];
 }
 
