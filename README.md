@@ -52,7 +52,7 @@ binding = "GHL_OAUTH_KV"
 id = "abc123def456..."
 ```
 
-Copy the `id` value into `wrangler.toml` — replace the `<YOUR_KV_NAMESPACE_ID>` placeholder.
+Edit `wrangler.toml` and replace the `id = "..."` value under `[[kv_namespaces]]` with the id wrangler just printed. The repo ships with the upstream maintainer's id committed — useless to anyone else (Cloudflare scopes KV access to your account credentials), but you still need your own to deploy under your own account.
 
 ### 3. Set secrets
 

@@ -14,12 +14,15 @@ compatibility_flags = ["nodejs_compat"]
 #   MCP_APPROVAL_CODE          — One-time code the operator pastes in /authorize. NEVER returned to clients.
 #   GHL_OAUTH_CLIENT_SECRET    — (Optional) Only if you enable a confidential client. Disabled by default.
 
-# Create a KV namespace for OAuth state (per-client bearers + auth codes):
+# Forkers: replace this id with your own. Create one via:
 #   wrangler kv:namespace create GHL_OAUTH_KV
-# Then paste the printed `id` value below.
+# Then paste the printed id below. The current value below points at the
+# upstream maintainer's KV — useless to anyone else (Cloudflare scopes KV
+# access to your account API token), but you still need your own id for
+# wrangler to deploy under your account.
 [[kv_namespaces]]
 binding = "GHL_OAUTH_KV"
-id = "<YOUR_KV_NAMESPACE_ID>"
+id = "1a02a7cf4c244b3caf2d12ae2b665252"
 
 # Per-endpoint rate limiters. All use Cloudflare's unsafe rate-limiter API (no extra cost).
 # `limit` is the max requests per `period` seconds, keyed by client IP.
