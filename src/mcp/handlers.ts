@@ -1,5 +1,4 @@
 import type { GHLApiEnv } from "../env.js";
-import { ToolError } from "../errors.js";
 import { addAppointment, getUpcomingAppointments } from "../ghl/calendar.js";
 import {
   addNote,
@@ -26,7 +25,7 @@ import {
   DEFAULT_APPOINTMENT_LOOKAHEAD_DAYS,
   DEFAULT_CONVERSATION_LIMIT,
 } from "../constants.js";
-import { toolSchemas, type ToolArgs, type ToolName } from "./schemas.js";
+import type { ToolArgs, ToolName } from "./schemas.js";
 
 function resolveAssignedTo(env: GHLApiEnv, value: string | undefined): string | undefined {
   if (value === undefined || value === "") return undefined;
@@ -37,7 +36,7 @@ function resolveAssignedTo(env: GHLApiEnv, value: string | undefined): string | 
 
 type Handler<N extends ToolName> = (env: GHLApiEnv, args: ToolArgs<N>) => Promise<unknown>;
 
-const HANDLERS: { [N in ToolName]: Handler<N> } = {
+export const HANDLERS: { [N in ToolName]: Handler<N> } = {
   search_contacts: (env, { query }) => searchContacts(env, query),
 
   get_contact: (env, { contactId }) => getContact(env, contactId),
@@ -138,28 +137,3 @@ const HANDLERS: { [N in ToolName]: Handler<N> } = {
   add_appointment: (env, { contactId, title, startTime, endTime, calendarId }) =>
     addAppointment(env, contactId, title, startTime, endTime, calendarId),
 };
-
-function isToolName(name: string): name is ToolName {
-  return Object.prototype.hasOwnProperty.call(toolSchemas, name);
-}
-
-export async function handleToolCall(
-  env: GHLApiEnv,
-  toolName: string,
-  rawArgs: unknown,
-): Promise<unknown> {
-  if (!isToolName(toolName)) {
-    throw ToolError.validation("unknown tool", `unknown tool: ${toolName}`);
-  }
-
-  const schema = toolSchemas[toolName];
-  const parsed = schema.safeParse(rawArgs);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const detail = issue ? `${issue.path.join(".") || "(root)"}: ${issue.message}` : "validation failed";
-    throw ToolError.validation(`invalid arguments — ${detail}`, JSON.stringify(parsed.error.issues));
-  }
-
-  const handler = HANDLERS[toolName] as Handler<typeof toolName>;
-  return handler(env, parsed.data as ToolArgs<typeof toolName>);
-}

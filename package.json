@@ -1,7 +1,7 @@
 {
   "name": "ghl-mcp",
-  "version": "2.0.0",
-  "description": "Cloudflare Workers MCP server bridging Claude to GoHighLevel CRM",
+  "version": "2.1.0",
+  "description": "Cloudflare Workers MCP server bridging Claude to GoHighLevel CRM (on @bashco/mcp-toolkit)",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@bashco/mcp-toolkit": "file:../../../ruflo-test/audits/mcp-toolkit",
     "hono": "^4.12.15",
     "zod": "^4.3.6"
   },

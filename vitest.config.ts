@@ -1,24 +1,9 @@
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { defineConfig } from "vitest/config";
 
-export default defineWorkersConfig({
-  test: {
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.toml" },
-        miniflare: {
-          compatibilityDate: "2024-11-01",
-          compatibilityFlags: ["nodejs_compat"],
-          kvNamespaces: ["GHL_OAUTH_KV"],
-          bindings: {
-            GHL_API_TOKEN: "test-ghl-token",
-            GHL_LOCATION_ID: "test-location",
-            GHL_USER_ID: "test-user",
-            GHL_CALENDAR_ID: "test-calendar",
-            MCP_APPROVAL_CODE: "test-approval-code",
-            GHL_OAUTH_CLIENT_SECRET: "",
-          },
-        },
-      },
-    },
-  },
+// Plain Node-based vitest (no workers pool).
+// The shared toolkit's test suite covers the OAuth + KV + middleware paths in miniflare;
+// this project's tests only cover pure functions (Zod schemas + tool definitions).
+// (Workers pool + miniflare misbehaves on paths containing spaces and '&'.)
+export default defineConfig({
+  test: {},
 });
