@@ -1,6 +1,6 @@
 import type { OpportunityStatus } from "../constants.js";
 import type { GHLApiEnv } from "../env.js";
-import { ToolError } from "../errors.js";
+import { ToolError } from "@bashco/mcp-toolkit";
 import { ghlFetch } from "./client.js";
 import { fetchAllPages } from "./pagination.js";
 import { buildPath } from "./path.js";

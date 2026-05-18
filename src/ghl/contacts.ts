@@ -1,5 +1,5 @@
 import type { GHLApiEnv } from "../env.js";
-import { ToolError } from "../errors.js";
+import { ToolError } from "@bashco/mcp-toolkit";
 import { ghlFetch } from "./client.js";
 import { buildPath } from "./path.js";
 import type { Contact, ContactSummary, Note, Task } from "./types.js";

@@ -1,4 +1,6 @@
-import { z } from "zod";
+import { defineTools, type ToolMap } from "@bashco/mcp-toolkit";
+import type { GHLApiEnv } from "../env.js";
+import { HANDLERS } from "./handlers.js";
 import { toolSchemas, type ToolName } from "./schemas.js";
 
 const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
@@ -107,26 +109,16 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     "Requires a contact ID — run search_contacts first if you only have a name or email.",
 };
 
-function jsonSchemaFor(name: ToolName): unknown {
-  const schema = toolSchemas[name];
-  const raw = z.toJSONSchema(schema, { target: "draft-2020-12" }) as Record<string, unknown>;
-  // The MCP JSON Schema MUST be an object schema with `properties`. Strip `$schema` if present.
-  delete raw.$schema;
-  if (raw.type === undefined) raw.type = "object";
-  if (raw.properties === undefined) raw.properties = {};
-  return raw;
-}
-
-export interface ToolDefinition {
-  name: ToolName;
-  description: string;
-  inputSchema: unknown;
-}
-
-export const toolDefinitions: ToolDefinition[] = (Object.keys(toolSchemas) as ToolName[]).map(
-  (name) => ({
-    name,
+const toolMap: ToolMap<GHLApiEnv> = {};
+for (const name of Object.keys(toolSchemas) as ToolName[]) {
+  toolMap[name] = {
+    schema: toolSchemas[name],
     description: TOOL_DESCRIPTIONS[name],
-    inputSchema: jsonSchemaFor(name),
-  }),
-);
+    handler: HANDLERS[name] as (env: GHLApiEnv, args: unknown) => Promise<unknown>,
+  };
+}
+
+const { toolDefinitions: definedToolDefinitions, dispatch } = defineTools<GHLApiEnv>(toolMap);
+
+export const toolDefinitions = definedToolDefinitions;
+export const dispatchToolCall = dispatch;

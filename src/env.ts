@@ -1,3 +1,5 @@
+import type { CloudflareRateLimiter } from "@bashco/mcp-toolkit";
+
 export interface GHLApiEnv {
   GHL_API_TOKEN: string;
   GHL_LOCATION_ID: string;
@@ -11,14 +13,10 @@ export interface WorkerEnv extends GHLApiEnv {
 
   GHL_OAUTH_KV: KVNamespace;
 
-  RATE_LIMIT_APPROVE: RateLimiter;
-  RATE_LIMIT_TOKEN: RateLimiter;
-  RATE_LIMIT_REGISTER: RateLimiter;
-  RATE_LIMIT_MCP: RateLimiter;
-}
-
-export interface RateLimiter {
-  limit(input: { key: string }): Promise<{ success: boolean }>;
+  RATE_LIMIT_APPROVE: CloudflareRateLimiter;
+  RATE_LIMIT_TOKEN: CloudflareRateLimiter;
+  RATE_LIMIT_REGISTER: CloudflareRateLimiter;
+  RATE_LIMIT_MCP: CloudflareRateLimiter;
 }
 
 export function ghlEnvFrom(env: WorkerEnv): GHLApiEnv {
