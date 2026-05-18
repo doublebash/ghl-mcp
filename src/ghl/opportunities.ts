@@ -1,76 +1,19 @@
-import { ghlRequest, GHLEnv } from "./client.js";
+import type { OpportunityStatus } from "../constants.js";
+import type { GHLApiEnv } from "../env.js";
+import { ToolError } from "../errors.js";
+import { ghlFetch } from "./client.js";
+import { fetchAllPages } from "./pagination.js";
+import { buildPath } from "./path.js";
+import type { Opportunity, Pipeline } from "./types.js";
 
 export interface OpportunityFilters {
   pipelineId?: string;
   stageId?: string;
-  status?: "open" | "won" | "lost" | "abandoned";
+  status?: OpportunityStatus;
   assignedTo?: string;
   minValue?: number;
   maxValue?: number;
-  staleDays?: number; // only return opportunities with no activity in X days
-}
-
-export async function getOpportunities(
-  env: GHLEnv,
-  filters: OpportunityFilters = {}
-): Promise<unknown[]> {
-  const params = new URLSearchParams({ location_id: env.GHL_LOCATION_ID });
-
-  if (filters.pipelineId) params.set("pipeline_id", filters.pipelineId);
-  if (filters.stageId) params.set("pipeline_stage_id", filters.stageId);
-  if (filters.status) params.set("status", filters.status);
-  if (filters.assignedTo) params.set("assigned_to", filters.assignedTo);
-
-  const data = await ghlRequest(
-    env,
-    "GET",
-    `/opportunities/search?${params}`
-  ) as { opportunities?: OpportunityRecord[] };
-
-  let results: OpportunityRecord[] = data.opportunities ?? [];
-
-  // GHL doesn't support value range or stale filtering natively — we do it here
-  if (filters.minValue !== undefined) {
-    results = results.filter((o) => (o.monetaryValue ?? 0) >= filters.minValue!);
-  }
-  if (filters.maxValue !== undefined) {
-    results = results.filter((o) => (o.monetaryValue ?? 0) <= filters.maxValue!);
-  }
-  if (filters.staleDays !== undefined) {
-    const cutoff = Date.now() - filters.staleDays * 24 * 60 * 60 * 1000;
-    results = results.filter((o) => {
-      const last = o.lastActivityDate ?? o.updatedAt ?? o.createdAt;
-      return last ? new Date(last).getTime() < cutoff : true;
-    });
-  }
-
-  return results;
-}
-
-export async function getOpportunity(
-  env: GHLEnv,
-  opportunityId: string
-): Promise<unknown> {
-  const data = await ghlRequest(
-    env,
-    "GET",
-    `/opportunities/${opportunityId}`
-  ) as { opportunity?: unknown };
-
-  if (!data.opportunity) throw new Error(`Opportunity not found: ${opportunityId}`);
-  return data.opportunity;
-}
-
-export async function getPipelines(env: GHLEnv): Promise<unknown[]> {
-  const params = new URLSearchParams({ locationId: env.GHL_LOCATION_ID });
-
-  const data = await ghlRequest(
-    env,
-    "GET",
-    `/opportunities/pipelines?${params}`
-  ) as { pipelines?: unknown[] };
-
-  return data.pipelines ?? [];
+  staleDays?: number;
 }
 
 export interface CreateOpportunityInput {
@@ -79,14 +22,87 @@ export interface CreateOpportunityInput {
   stageId: string;
   contactId: string;
   monetaryValue?: number;
-  status?: "open" | "won" | "lost" | "abandoned";
+  status?: OpportunityStatus;
   assignedTo?: string;
 }
 
+export type UpdateOpportunityInput = Partial<
+  Omit<CreateOpportunityInput, "pipelineId" | "contactId">
+>;
+
+async function fetchOpportunityPage(
+  env: GHLApiEnv,
+  filters: OpportunityFilters,
+  page: number,
+): Promise<{ items: Opportunity[]; hasMore: boolean }> {
+  const data = await ghlFetch<{ opportunities?: Opportunity[]; meta?: { nextPageUrl?: string | null } }>(
+    env,
+    {
+      method: "GET",
+      path: "/opportunities/search",
+      query: {
+        location_id: env.GHL_LOCATION_ID,
+        ...(filters.pipelineId !== undefined ? { pipeline_id: filters.pipelineId } : {}),
+        ...(filters.stageId !== undefined ? { pipeline_stage_id: filters.stageId } : {}),
+        ...(filters.status !== undefined ? { status: filters.status } : {}),
+        ...(filters.assignedTo !== undefined ? { assigned_to: filters.assignedTo } : {}),
+        page,
+      },
+    },
+  );
+  const items = data?.opportunities ?? [];
+  const nextUrl = data?.meta?.nextPageUrl ?? null;
+  return { items, hasMore: items.length > 0 && nextUrl !== null };
+}
+
+export async function getOpportunities(
+  env: GHLApiEnv,
+  filters: OpportunityFilters = {},
+): Promise<Opportunity[]> {
+  const all = await fetchAllPages<Opportunity>((page) => fetchOpportunityPage(env, filters, page));
+
+  let results = all;
+  if (filters.minValue !== undefined) {
+    const min = filters.minValue;
+    results = results.filter((o) => (o.monetaryValue ?? 0) >= min);
+  }
+  if (filters.maxValue !== undefined) {
+    const max = filters.maxValue;
+    results = results.filter((o) => (o.monetaryValue ?? 0) <= max);
+  }
+  if (filters.staleDays !== undefined) {
+    const cutoff = Date.now() - filters.staleDays * 24 * 60 * 60 * 1000;
+    results = results.filter((o) => {
+      const last = o.lastActivityDate ?? o.updatedAt ?? o.createdAt;
+      return last !== undefined ? new Date(last).getTime() < cutoff : true;
+    });
+  }
+
+  return results;
+}
+
+export async function getOpportunity(env: GHLApiEnv, opportunityId: string): Promise<Opportunity> {
+  const data = await ghlFetch<{ opportunity?: Opportunity }>(env, {
+    method: "GET",
+    path: buildPath("/opportunities/{opportunityId}", { opportunityId }),
+  });
+  if (!data?.opportunity) throw ToolError.notFound("opportunity", opportunityId);
+  return data.opportunity;
+}
+
+export async function getPipelines(env: GHLApiEnv): Promise<Pipeline[]> {
+  const data = await ghlFetch<{ pipelines?: Pipeline[] }>(env, {
+    method: "GET",
+    path: "/opportunities/pipelines",
+    query: { locationId: env.GHL_LOCATION_ID },
+  });
+  return data?.pipelines ?? [];
+}
+
 export async function createOpportunity(
-  env: GHLEnv,
-  input: CreateOpportunityInput
-): Promise<unknown> {
+  env: GHLApiEnv,
+  input: CreateOpportunityInput,
+): Promise<Opportunity> {
   const body = {
     name: input.name,
     pipelineId: input.pipelineId,
@@ -94,23 +110,28 @@ export async function createOpportunity(
     contactId: input.contactId,
     locationId: env.GHL_LOCATION_ID,
     status: input.status ?? "open",
-    ...(input.monetaryValue !== undefined && { monetaryValue: input.monetaryValue }),
-    ...(input.assignedTo && { assignedTo: input.assignedTo }),
+    ...(input.monetaryValue !== undefined ? { monetaryValue: input.monetaryValue } : {}),
+    ...(input.assignedTo !== undefined ? { assignedTo: input.assignedTo } : {}),
   };
-
-  const data = await ghlRequest(env, "POST", `/opportunities/`, body) as {
-    opportunity?: unknown;
-  };
-
-  if (!data.opportunity) throw new Error("Failed to create opportunity — no opportunity returned");
+  const data = await ghlFetch<{ opportunity?: Opportunity }>(env, {
+    method: "POST",
+    path: "/opportunities/",
+    body,
+  });
+  if (!data?.opportunity) {
+    throw new ToolError({
+      userMessage: "failed to create opportunity",
+      internalMessage: "create_opportunity returned no opportunity",
+    });
+  }
   return data.opportunity;
 }
 
 export async function updateOpportunity(
-  env: GHLEnv,
+  env: GHLApiEnv,
   opportunityId: string,
-  input: Partial<Omit<CreateOpportunityInput, "pipelineId" | "contactId">>
-): Promise<unknown> {
+  input: UpdateOpportunityInput,
+): Promise<Opportunity> {
   const body: Record<string, unknown> = {};
   if (input.name !== undefined) body.name = input.name;
   if (input.stageId !== undefined) body.pipelineStageId = input.stageId;
@@ -118,19 +139,16 @@ export async function updateOpportunity(
   if (input.monetaryValue !== undefined) body.monetaryValue = input.monetaryValue;
   if (input.assignedTo !== undefined) body.assignedTo = input.assignedTo;
 
-  const data = await ghlRequest(env, "PUT", `/opportunities/${opportunityId}`, body) as {
-    opportunity?: unknown;
-  };
-
-  if (!data.opportunity) throw new Error(`Failed to update opportunity: ${opportunityId}`);
+  const data = await ghlFetch<{ opportunity?: Opportunity }>(env, {
+    method: "PUT",
+    path: buildPath("/opportunities/{opportunityId}", { opportunityId }),
+    body,
+  });
+  if (!data?.opportunity) {
+    throw new ToolError({
+      userMessage: "failed to update opportunity",
+      internalMessage: `update_opportunity returned no opportunity for id ${opportunityId}`,
+    });
+  }
   return data.opportunity;
-}
-
-interface OpportunityRecord {
-  id: string;
-  monetaryValue?: number;
-  lastActivityDate?: string;
-  updatedAt?: string;
-  createdAt?: string;
-  [key: string]: unknown;
 }

@@ -1,40 +1,72 @@
-# GHL MCP Server
+# GHL MCP Server (rebuilt)
 
-Custom MCP (Model Context Protocol) server connecting Claude to GoHighLevel CRM, hosted on Cloudflare Workers.
+A hardened Model Context Protocol server bridging Claude to GoHighLevel CRM, deployed on Cloudflare Workers.
 
-**Worker URL:** https://ghl-mcp.bashar-basheer.workers.dev
+This is the v2 rebuild of the original `gohighlevel-mcp` server. See `AUDIT.md` in `audits/gohighlevel-mcp/` for the full list of findings this rebuild closes.
 
-## What this does
+## What changed vs v1
 
-Gives Claude direct access to GoHighLevel for contact management, opportunities, pipelines, appointments, conversations, and workflow triggers — controlled through natural language in Claude.
+- **Per-client bearer tokens.** Each successful OAuth exchange now issues a unique, KV-backed access token. Compromise of one token affects only that client.
+- **Approval code separated from the runtime bearer.** The operator-only `MCP_APPROVAL_CODE` is no longer also the API token.
+- **Cloudflare rate limiting** on `/approve`, `/token`, `/register`, `/mcp`.
+- **CORS pinned** to claude.ai / claude.com origins. No more `Access-Control-Allow-Origin: *`.
+- **Strict redirect_uri allowlist** — no `*.claude.ai` wildcard.
+- **Zod-validated tool arguments.** JSON Schema for MCP is derived from the same schemas, so they cannot drift.
+- **Centralised GHL path encoding** with strict ID regex — closes the path-traversal-into-GHL-API class.
+- **`ToolError` class** — only safe messages reach the MCP caller; GHL response bodies stay in structured logs.
+- **`client_credentials` flow removed.** Claude uses `authorization_code` + PKCE exclusively.
+- **Vitest** test suite covering auth, OAuth, JSON-RPC plumbing, schemas, path encoding, and handler dispatch.
 
 ## Stack
 
-- Cloudflare Workers
-- TypeScript
-- Wrangler
+- Cloudflare Workers (compatibility_date 2024-11-01, `nodejs_compat`)
+- TypeScript (strict, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`)
+- Hono v4
+- Zod v4 (single source of truth for tool argument shapes)
+- Vitest with `@cloudflare/vitest-pool-workers`
 
 ## Local development
 
 ```bash
 npm install
-wrangler dev
+cp .dev.vars.example .dev.vars   # then fill in values; .dev.vars is gitignored
+npm test                          # vitest with workers pool
+npm run typecheck                 # tsc --noEmit
+npm run dev                       # wrangler dev
 ```
 
 ## Deployment
 
+CI does `typecheck` + `test` before `wrangler deploy` (see `.github/workflows/deploy.yml`). To deploy manually:
+
 ```bash
-wrangler deploy
+npm run deploy
 ```
+
+See `ROLLOUT.md` for the v1 → v2 cut-over (secret rotation, re-authorisation, etc.).
 
 ## Secrets
 
-Secrets are managed via `wrangler secret put` and are not stored in this repo. Required secrets:
+All managed via `wrangler secret put`:
 
-- `GHL_API_TOKEN`
-- `GHL_LOCATION_ID`
-- `GHL_USER_ID`
-- `GHL_CALENDAR_ID`
-- `MCP_AUTH_TOKEN`
+| Secret                    | Purpose                                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `GHL_API_TOKEN`           | GoHighLevel API token (location-scoped, least-privilege).                                                       |
+| `GHL_LOCATION_ID`         | GHL location ID.                                                                                                |
+| `GHL_USER_ID`             | Default assigned-to user.                                                                                       |
+| `GHL_CALENDAR_ID`         | Default calendar for `add_appointment`.                                                                         |
+| `MCP_APPROVAL_CODE`       | One-time code the operator pastes in `/authorize`. NEVER returned to clients and NEVER used as a bearer token. |
+| `GHL_OAUTH_CLIENT_SECRET` | Optional. Reserved for future confidential-client support; unused by default.                                   |
 
-See `wrangler.toml` for full config.
+KV namespace `GHL_OAUTH_KV` stores:
+
+- `code:<authCode>` — one-time OAuth codes (5 min TTL).
+- `bearer:<sha256(token)>` — per-client bearer records (30 day TTL).
+
+Raw bearer tokens are never stored — only their SHA-256 hash. Compromise of the KV namespace does not leak bearer tokens.
+
+## Tool surface
+
+20 tools covering contacts, opportunities, pipelines, conversations, appointments, workflows, tags, tasks, notes. The full list and JSON Schema is served at `tools/list` over the MCP JSON-RPC endpoint.
+
+Run `tools/list` from any MCP client to see the live tool catalogue.

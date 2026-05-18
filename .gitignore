@@ -1,25 +1,20 @@
-# Dependencies
 node_modules/
-
-# Build output
 dist/
 *.tsbuildinfo
 
-# Cloudflare / Wrangler
 .wrangler/
 .dev.vars*
 !.dev.vars.example
 
-# Environment
 .env*
 !.env.example
 
-# Local Claude Code state
 .claude/
+.claude-flow/
 
-# Logs
 *.log
 
-# OS
 .DS_Store
 Thumbs.db
+
+coverage/

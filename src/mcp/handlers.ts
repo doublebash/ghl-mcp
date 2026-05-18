@@ -1,188 +1,165 @@
-import { GHLEnv } from "../ghl/client.js";
-import { searchContacts, getContact, createContact, updateContact, addNote, listNotes, updateNote, deleteNote, addTask, addTag } from "../ghl/contacts.js";
-import { getOpportunities, getOpportunity, createOpportunity, updateOpportunity, getPipelines } from "../ghl/opportunities.js";
+import type { GHLApiEnv } from "../env.js";
+import { ToolError } from "../errors.js";
+import { addAppointment, getUpcomingAppointments } from "../ghl/calendar.js";
+import {
+  addNote,
+  addTag,
+  addTask,
+  createContact,
+  deleteNote,
+  getContact,
+  listNotes,
+  searchContacts,
+  updateContact,
+  updateNote,
+} from "../ghl/contacts.js";
 import { getConversationHistory } from "../ghl/conversations.js";
-import { getUpcomingAppointments, addAppointment } from "../ghl/calendar.js";
+import {
+  createOpportunity,
+  getOpportunities,
+  getOpportunity,
+  getPipelines,
+  updateOpportunity,
+} from "../ghl/opportunities.js";
 import { listWorkflows, triggerWorkflow } from "../ghl/workflows.js";
+import {
+  DEFAULT_APPOINTMENT_LOOKAHEAD_DAYS,
+  DEFAULT_CONVERSATION_LIMIT,
+} from "../constants.js";
+import { toolSchemas, type ToolArgs, type ToolName } from "./schemas.js";
 
-// Resolve an `assignedTo` argument: 'me' (or empty) maps to the configured GHL user,
-// anything else is treated as a raw GHL user ID.
-function resolveAssignedTo(env: GHLEnv, value: unknown): string | undefined {
-  if (value === undefined || value === null || value === "") return undefined;
-  const v = String(value).trim();
+function resolveAssignedTo(env: GHLApiEnv, value: string | undefined): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  const v = value.trim();
   if (v.toLowerCase() === "me") return env.GHL_USER_ID;
   return v;
 }
 
+type Handler<N extends ToolName> = (env: GHLApiEnv, args: ToolArgs<N>) => Promise<unknown>;
+
+const HANDLERS: { [N in ToolName]: Handler<N> } = {
+  search_contacts: (env, { query }) => searchContacts(env, query),
+
+  get_contact: (env, { contactId }) => getContact(env, contactId),
+
+  create_contact: (env, args) =>
+    createContact(env, {
+      ...(args.firstName !== undefined ? { firstName: args.firstName } : {}),
+      ...(args.lastName !== undefined ? { lastName: args.lastName } : {}),
+      ...(args.email !== undefined ? { email: args.email } : {}),
+      ...(args.phone !== undefined ? { phone: args.phone } : {}),
+      ...(args.companyName !== undefined ? { companyName: args.companyName } : {}),
+      ...(args.source !== undefined ? { source: args.source } : {}),
+      ...(args.tags !== undefined ? { tags: args.tags } : {}),
+      ...(args.assignedTo !== undefined
+        ? { assignedTo: resolveAssignedTo(env, args.assignedTo) ?? args.assignedTo }
+        : {}),
+    }),
+
+  update_contact: (env, { contactId, ...rest }) =>
+    updateContact(env, contactId, {
+      ...(rest.firstName !== undefined ? { firstName: rest.firstName } : {}),
+      ...(rest.lastName !== undefined ? { lastName: rest.lastName } : {}),
+      ...(rest.email !== undefined ? { email: rest.email } : {}),
+      ...(rest.phone !== undefined ? { phone: rest.phone } : {}),
+      ...(rest.companyName !== undefined ? { companyName: rest.companyName } : {}),
+      ...(rest.source !== undefined ? { source: rest.source } : {}),
+      ...(rest.tags !== undefined ? { tags: rest.tags } : {}),
+      ...(rest.assignedTo !== undefined
+        ? { assignedTo: resolveAssignedTo(env, rest.assignedTo) ?? rest.assignedTo }
+        : {}),
+    }),
+
+  add_tag: (env, { contactId, tags }) => addTag(env, contactId, tags),
+
+  add_task: (env, { contactId, title, dueDate, body }) => addTask(env, contactId, title, dueDate, body),
+
+  add_note: (env, { contactId, body }) => addNote(env, contactId, body),
+
+  list_notes: (env, { contactId }) => listNotes(env, contactId),
+
+  update_note: (env, { contactId, noteId, body }) => updateNote(env, contactId, noteId, body),
+
+  delete_note: (env, { contactId, noteId }) => deleteNote(env, contactId, noteId),
+
+  get_opportunities: (env, args) =>
+    getOpportunities(env, {
+      ...(args.pipelineId !== undefined ? { pipelineId: args.pipelineId } : {}),
+      ...(args.stageId !== undefined ? { stageId: args.stageId } : {}),
+      ...(args.status !== undefined ? { status: args.status } : {}),
+      ...(args.assignedTo !== undefined ? { assignedTo: args.assignedTo } : {}),
+      ...(args.minValue !== undefined ? { minValue: args.minValue } : {}),
+      ...(args.maxValue !== undefined ? { maxValue: args.maxValue } : {}),
+      ...(args.staleDays !== undefined ? { staleDays: args.staleDays } : {}),
+    }),
+
+  get_opportunity: (env, { opportunityId }) => getOpportunity(env, opportunityId),
+
+  create_opportunity: (env, args) =>
+    createOpportunity(env, {
+      name: args.name,
+      pipelineId: args.pipelineId,
+      stageId: args.stageId,
+      contactId: args.contactId,
+      ...(args.monetaryValue !== undefined ? { monetaryValue: args.monetaryValue } : {}),
+      ...(args.status !== undefined ? { status: args.status } : {}),
+      ...(args.assignedTo !== undefined
+        ? { assignedTo: resolveAssignedTo(env, args.assignedTo) ?? args.assignedTo }
+        : {}),
+    }),
+
+  update_opportunity: (env, { opportunityId, ...rest }) =>
+    updateOpportunity(env, opportunityId, {
+      ...(rest.name !== undefined ? { name: rest.name } : {}),
+      ...(rest.stageId !== undefined ? { stageId: rest.stageId } : {}),
+      ...(rest.status !== undefined ? { status: rest.status } : {}),
+      ...(rest.monetaryValue !== undefined ? { monetaryValue: rest.monetaryValue } : {}),
+      ...(rest.assignedTo !== undefined
+        ? { assignedTo: resolveAssignedTo(env, rest.assignedTo) ?? rest.assignedTo }
+        : {}),
+    }),
+
+  get_pipelines: (env) => getPipelines(env),
+
+  list_workflows: (env) => listWorkflows(env),
+
+  trigger_workflow: (env, { contactId, workflowId, eventStartTime }) =>
+    triggerWorkflow(env, contactId, workflowId, eventStartTime),
+
+  get_upcoming_appointments: (env, args) =>
+    getUpcomingAppointments(env, {
+      ...(args.contactId !== undefined ? { contactId: args.contactId } : {}),
+      daysAhead: args.daysAhead ?? DEFAULT_APPOINTMENT_LOOKAHEAD_DAYS,
+    }),
+
+  get_conversation_history: (env, { contactId, limit }) =>
+    getConversationHistory(env, contactId, limit ?? DEFAULT_CONVERSATION_LIMIT),
+
+  add_appointment: (env, { contactId, title, startTime, endTime, calendarId }) =>
+    addAppointment(env, contactId, title, startTime, endTime, calendarId),
+};
+
+function isToolName(name: string): name is ToolName {
+  return Object.prototype.hasOwnProperty.call(toolSchemas, name);
+}
+
 export async function handleToolCall(
-  env: GHLEnv,
+  env: GHLApiEnv,
   toolName: string,
-  args: Record<string, unknown>
+  rawArgs: unknown,
 ): Promise<unknown> {
-  switch (toolName) {
-    case "search_contacts": {
-      const query = args["query"] as string;
-      return searchContacts(env, query);
-    }
-
-    case "get_opportunities": {
-      return getOpportunities(env, {
-        pipelineId: args["pipelineId"] as string | undefined,
-        stageId: args["stageId"] as string | undefined,
-        status: args["status"] as "open" | "won" | "lost" | "abandoned" | undefined,
-        assignedTo: args["assignedTo"] as string | undefined,
-        minValue: args["minValue"] as number | undefined,
-        maxValue: args["maxValue"] as number | undefined,
-        staleDays: args["staleDays"] as number | undefined,
-      });
-    }
-
-    case "get_opportunity": {
-      const opportunityId = args["opportunityId"] as string;
-      return getOpportunity(env, opportunityId);
-    }
-
-    case "create_opportunity": {
-      return createOpportunity(env, {
-        name: args["name"] as string,
-        pipelineId: args["pipelineId"] as string,
-        stageId: args["stageId"] as string,
-        contactId: args["contactId"] as string,
-        monetaryValue: args["monetaryValue"] as number | undefined,
-        status: args["status"] as "open" | "won" | "lost" | "abandoned" | undefined,
-        assignedTo: resolveAssignedTo(env, args["assignedTo"]),
-      });
-    }
-
-    case "update_opportunity": {
-      return updateOpportunity(env, args["opportunityId"] as string, {
-        name: args["name"] as string | undefined,
-        stageId: args["stageId"] as string | undefined,
-        status: args["status"] as "open" | "won" | "lost" | "abandoned" | undefined,
-        monetaryValue: args["monetaryValue"] as number | undefined,
-        assignedTo: resolveAssignedTo(env, args["assignedTo"]),
-      });
-    }
-
-    case "list_workflows": {
-      return listWorkflows(env);
-    }
-
-    case "trigger_workflow": {
-      return triggerWorkflow(
-        env,
-        args["contactId"] as string,
-        args["workflowId"] as string,
-        args["eventStartTime"] as string | undefined
-      );
-    }
-
-    case "get_pipelines": {
-      return getPipelines(env);
-    }
-
-    case "get_upcoming_appointments": {
-      return getUpcomingAppointments(env, {
-        contactId: args["contactId"] as string | undefined,
-        daysAhead: args["daysAhead"] as number | undefined,
-      });
-    }
-
-    case "get_conversation_history": {
-      const contactId = args["contactId"] as string;
-      const limit = args["limit"] as number | undefined;
-      return getConversationHistory(env, contactId, limit);
-    }
-
-    case "add_appointment": {
-      return addAppointment(
-        env,
-        args["contactId"] as string,
-        args["title"] as string,
-        args["startTime"] as string,
-        args["endTime"] as string,
-        args["calendarId"] as string | undefined
-      );
-    }
-
-    case "add_tag": {
-      return addTag(
-        env,
-        args["contactId"] as string,
-        args["tags"] as string[]
-      );
-    }
-
-    case "add_task": {
-      return addTask(
-        env,
-        args["contactId"] as string,
-        args["title"] as string,
-        args["dueDate"] as string,
-        args["body"] as string | undefined
-      );
-    }
-
-    case "add_note": {
-      const contactId = args["contactId"] as string;
-      const body = args["body"] as string;
-      return addNote(env, contactId, body);
-    }
-
-    case "list_notes": {
-      return listNotes(env, args["contactId"] as string);
-    }
-
-    case "update_note": {
-      return updateNote(
-        env,
-        args["contactId"] as string,
-        args["noteId"] as string,
-        args["body"] as string
-      );
-    }
-
-    case "delete_note": {
-      return deleteNote(
-        env,
-        args["contactId"] as string,
-        args["noteId"] as string
-      );
-    }
-
-    case "update_contact": {
-      const contactId = args["contactId"] as string;
-      return updateContact(env, contactId, {
-        firstName: args["firstName"] as string | undefined,
-        lastName: args["lastName"] as string | undefined,
-        email: args["email"] as string | undefined,
-        phone: args["phone"] as string | undefined,
-        companyName: args["companyName"] as string | undefined,
-        source: args["source"] as string | undefined,
-        tags: args["tags"] as string[] | undefined,
-        assignedTo: resolveAssignedTo(env, args["assignedTo"]),
-      });
-    }
-
-    case "create_contact": {
-      return createContact(env, {
-        firstName: args["firstName"] as string | undefined,
-        lastName: args["lastName"] as string | undefined,
-        email: args["email"] as string | undefined,
-        phone: args["phone"] as string | undefined,
-        companyName: args["companyName"] as string | undefined,
-        source: args["source"] as string | undefined,
-        tags: args["tags"] as string[] | undefined,
-        assignedTo: resolveAssignedTo(env, args["assignedTo"]),
-      });
-    }
-
-    case "get_contact": {
-      const contactId = args["contactId"] as string;
-      return getContact(env, contactId);
-    }
-
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
+  if (!isToolName(toolName)) {
+    throw ToolError.validation("unknown tool", `unknown tool: ${toolName}`);
   }
+
+  const schema = toolSchemas[toolName];
+  const parsed = schema.safeParse(rawArgs);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const detail = issue ? `${issue.path.join(".") || "(root)"}: ${issue.message}` : "validation failed";
+    throw ToolError.validation(`invalid arguments — ${detail}`, JSON.stringify(parsed.error.issues));
+  }
+
+  const handler = HANDLERS[toolName] as Handler<typeof toolName>;
+  return handler(env, parsed.data as ToolArgs<typeof toolName>);
 }

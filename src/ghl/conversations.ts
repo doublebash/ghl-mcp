@@ -1,42 +1,40 @@
-import { ghlRequest, GHLEnv } from "./client.js";
+import type { GHLApiEnv } from "../env.js";
+import { ghlFetch } from "./client.js";
+import { buildPath } from "./path.js";
+import type { Message } from "./types.js";
+
+export interface ConversationHistory {
+  contactId: string;
+  conversationId?: string;
+  messages: Message[];
+}
 
 export async function getConversationHistory(
-  env: GHLEnv,
+  env: GHLApiEnv,
   contactId: string,
-  limit = 20
-): Promise<unknown> {
-  // Step 1: find the conversation for this contact
-  const params = new URLSearchParams({
-    locationId: env.GHL_LOCATION_ID,
-    contactId,
+  limit: number,
+): Promise<ConversationHistory> {
+  const search = await ghlFetch<{ conversations?: { id: string }[] }>(env, {
+    method: "GET",
+    path: "/conversations/search",
+    query: { locationId: env.GHL_LOCATION_ID, contactId },
   });
 
-  const search = await ghlRequest(
-    env,
-    "GET",
-    `/conversations/search?${params}`
-  ) as { conversations?: { id: string }[] };
-
-  const conversations = search.conversations ?? [];
-
+  const conversations = search?.conversations ?? [];
   if (conversations.length === 0) {
-    return { contactId, conversations: [], messages: [] };
+    return { contactId, messages: [] };
   }
 
-  // Step 2: fetch messages from the most recent conversation
   const conversationId = conversations[0]!.id;
-
-  const msgParams = new URLSearchParams({ limit: String(limit) });
-
-  const msgs = await ghlRequest(
-    env,
-    "GET",
-    `/conversations/${conversationId}/messages?${msgParams}`
-  ) as { messages?: unknown };
+  const msgs = await ghlFetch<{ messages?: Message[] }>(env, {
+    method: "GET",
+    path: buildPath("/conversations/{conversationId}/messages", { conversationId }),
+    query: { limit },
+  });
 
   return {
     contactId,
     conversationId,
-    messages: msgs.messages ?? [],
+    messages: msgs?.messages ?? [],
   };
 }
