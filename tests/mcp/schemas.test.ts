@@ -17,6 +17,11 @@ const expectedTools: ToolName[] = [
   "add_tag",
   "add_task",
   "complete_task",
+  "search_tasks",
+  "list_tasks",
+  "get_task",
+  "update_task",
+  "delete_task",
   "add_note",
   "list_notes",
   "update_note",
@@ -27,7 +32,7 @@ const expectedTools: ToolName[] = [
 ];
 
 describe("tool catalogue", () => {
-  it("declares the expected 21 tools", () => {
+  it("declares the expected 26 tools", () => {
     expect(toolDefinitions.length).toBe(expectedTools.length);
     const names = toolDefinitions.map((t) => t.name);
     for (const name of expectedTools) {

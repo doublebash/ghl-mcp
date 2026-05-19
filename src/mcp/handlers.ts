@@ -7,11 +7,16 @@ import {
   completeTask,
   createContact,
   deleteNote,
+  deleteTask,
   getContact,
+  getTask,
   listNotes,
+  listTasks,
   searchContacts,
+  searchTasks,
   updateContact,
   updateNote,
+  updateTask,
 } from "../ghl/contacts.js";
 import { getConversationHistory } from "../ghl/conversations.js";
 import {
@@ -76,6 +81,35 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
 
   complete_task: (env, { contactId, taskId, completed }) =>
     completeTask(env, contactId, taskId, completed ?? true),
+
+  search_tasks: (env, args) =>
+    searchTasks(env, {
+      ...(args.completed !== undefined ? { completed: args.completed } : {}),
+      ...(args.contactId !== undefined ? { contactId: args.contactId } : {}),
+      ...(args.assignedTo !== undefined
+        ? { assignedTo: resolveAssignedTo(env, args.assignedTo) ?? args.assignedTo }
+        : {}),
+      ...(args.query !== undefined ? { query: args.query } : {}),
+      ...(args.dueDateFrom !== undefined ? { dueDateFrom: args.dueDateFrom } : {}),
+      ...(args.dueDateTo !== undefined ? { dueDateTo: args.dueDateTo } : {}),
+      ...(args.limit !== undefined ? { limit: args.limit } : {}),
+    }),
+
+  list_tasks: (env, { contactId }) => listTasks(env, contactId),
+
+  get_task: (env, { contactId, taskId }) => getTask(env, contactId, taskId),
+
+  update_task: (env, { contactId, taskId, ...rest }) =>
+    updateTask(env, contactId, taskId, {
+      ...(rest.title !== undefined ? { title: rest.title } : {}),
+      ...(rest.body !== undefined ? { body: rest.body } : {}),
+      ...(rest.dueDate !== undefined ? { dueDate: rest.dueDate } : {}),
+      ...(rest.assignedTo !== undefined
+        ? { assignedTo: resolveAssignedTo(env, rest.assignedTo) ?? rest.assignedTo }
+        : {}),
+    }),
+
+  delete_task: (env, { contactId, taskId }) => deleteTask(env, contactId, taskId),
 
   add_note: (env, { contactId, body }) => addNote(env, contactId, body),
 

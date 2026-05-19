@@ -109,6 +109,39 @@ export const toolSchemas = {
     completed: z.boolean().optional(),
   }),
 
+  search_tasks: z.object({
+    completed: z.boolean().optional(),
+    contactId: ghlId.optional(),
+    assignedTo: limitedString(128).optional(),
+    query: limitedString(256).optional(),
+    dueDateFrom: isoDateTime.optional(),
+    dueDateTo: isoDateTime.optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  }),
+
+  list_tasks: z.object({
+    contactId: ghlId,
+  }),
+
+  get_task: z.object({
+    contactId: ghlId,
+    taskId: ghlId,
+  }),
+
+  update_task: z.object({
+    contactId: ghlId,
+    taskId: ghlId,
+    title: limitedString(256).optional(),
+    body: limitedString(8192).optional(),
+    dueDate: isoDateTime.optional(),
+    assignedTo: limitedString(128).optional(),
+  }),
+
+  delete_task: z.object({
+    contactId: ghlId,
+    taskId: ghlId,
+  }),
+
   add_note: z.object({
     contactId: ghlId,
     body: limitedString(16_384),

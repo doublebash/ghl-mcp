@@ -78,6 +78,39 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     "Pass completed: false to reopen a task that was closed by mistake. " +
     "Defaults to completed: true. Requires a contact ID and task ID.",
 
+  search_tasks:
+    "Search GoHighLevel tasks across all contacts with filters. " +
+    "Use this to build daily / weekly follow-up views — pass completed: false to see open tasks, " +
+    "filter by assignedTo (a GHL user ID or 'me') and dueDateFrom / dueDateTo (ISO 8601 with timezone) " +
+    "to scope to a date window. Optionally filter by a single contactId or free-text query. " +
+    "Returns an array of tasks each with id, title, body, dueDate, completed, assignedTo, and contactId — " +
+    "everything a follow-up workflow needs without per-contact roundtrips. " +
+    "Default page size is GHL's default; pass limit (1–100) to override.",
+
+  list_tasks:
+    "List all tasks attached to a single GoHighLevel contact. " +
+    "Use this when you already know the contact and want their full task history (open + completed). " +
+    "For a global \"all my open follow-ups\" view across all contacts, use search_tasks instead. " +
+    "Requires a contact ID — run search_contacts first if you only have a name.",
+
+  get_task:
+    "Get the full details of a single GoHighLevel task by ID. " +
+    "Useful for refreshing the latest state of a known task (e.g. has it been completed by someone else, has the due date moved). " +
+    "Requires a contact ID and a task ID — usually you'd have these from a prior search_tasks / list_tasks / add_task call.",
+
+  update_task:
+    "Update an existing GoHighLevel task's title, body, due date, or assignee. " +
+    "Use this to reschedule a follow-up (change dueDate), reassign it to another user (assignedTo: a GHL user ID or 'me'), " +
+    "or correct the title/body. Only the fields you provide are changed — omitted fields are left as-is. " +
+    "To mark a task complete, use complete_task instead — this tool does not touch the completed flag. " +
+    "Requires a contact ID and task ID.",
+
+  delete_task:
+    "Delete a GoHighLevel task entirely. " +
+    "This modifies existing data and cannot be undone. " +
+    "Prefer complete_task for follow-ups that are done — deletion is for tasks created in error or no longer relevant. " +
+    "Requires a contact ID and task ID.",
+
   add_note:
     "Append a note to a GoHighLevel contact record. " +
     "Use this to log a call summary, record what was discussed in a meeting, or save research about a contact. " +
