@@ -164,7 +164,14 @@ export async function searchTasks(
     }),
     body,
   });
-  const tasks = data?.tasks ?? [];
+  // GHL's task-search response uses `_id` (Mongo-style); every other task
+  // endpoint returns `id`. Normalise so callers can always use `task.id`.
+  const tasks = (data?.tasks ?? []).map((t) => {
+    if (t.id === undefined && typeof t._id === "string") {
+      return { ...t, id: t._id };
+    }
+    return t;
+  });
 
   // Client-side due-date narrowing. Tasks without a parseable dueDate are
   // dropped from a windowed query (treated as "not in window") — pass no
