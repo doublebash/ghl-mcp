@@ -93,6 +93,7 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
       ...(args.dueDateFrom !== undefined ? { dueDateFrom: args.dueDateFrom } : {}),
       ...(args.dueDateTo !== undefined ? { dueDateTo: args.dueDateTo } : {}),
       ...(args.limit !== undefined ? { limit: args.limit } : {}),
+      ...(args.skip !== undefined ? { skip: args.skip } : {}),
     }),
 
   list_tasks: (env, { contactId }) => listTasks(env, contactId),

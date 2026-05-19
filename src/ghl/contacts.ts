@@ -138,33 +138,47 @@ export interface SearchTasksInput {
   dueDateFrom?: string;
   dueDateTo?: string;
   limit?: number;
+  skip?: number;
 }
 
 export async function searchTasks(
   env: GHLApiEnv,
   input: SearchTasksInput,
 ): Promise<Task[]> {
-  const body: Record<string, unknown> = {
-    locationId: env.GHL_LOCATION_ID,
-  };
+  // GHL's task search lives under the location namespace, not the contact one.
+  // Supported body fields (per the v2 OpenAPI spec): contactId[], completed,
+  // assignedTo[], query, limit, skip, businessId. Notably absent: any form of
+  // due-date filter — we apply that client-side after the fetch.
+  const body: Record<string, unknown> = {};
   if (input.completed !== undefined) body.completed = input.completed;
   if (input.contactId !== undefined) body.contactId = [input.contactId];
   if (input.assignedTo !== undefined) body.assignedTo = [input.assignedTo];
   if (input.query !== undefined) body.query = input.query;
-  if (input.dueDateFrom !== undefined || input.dueDateTo !== undefined) {
-    const range: Record<string, string> = {};
-    if (input.dueDateFrom !== undefined) range.startDate = input.dueDateFrom;
-    if (input.dueDateTo !== undefined) range.endDate = input.dueDateTo;
-    body.dueDate = range;
-  }
   if (input.limit !== undefined) body.limit = input.limit;
+  if (input.skip !== undefined) body.skip = input.skip;
 
   const data = await ghlFetch<{ tasks?: Task[] }>(env, {
     method: "POST",
-    path: "/contacts/tasks/search",
+    path: buildPath("/locations/{locationId}/tasks/search", {
+      locationId: env.GHL_LOCATION_ID,
+    }),
     body,
   });
-  return data?.tasks ?? [];
+  const tasks = data?.tasks ?? [];
+
+  // Client-side due-date narrowing. Tasks without a parseable dueDate are
+  // dropped from a windowed query (treated as "not in window") — pass no
+  // window filters if you want them.
+  if (input.dueDateFrom === undefined && input.dueDateTo === undefined) {
+    return tasks;
+  }
+  const from = input.dueDateFrom !== undefined ? Date.parse(input.dueDateFrom) : -Infinity;
+  const to = input.dueDateTo !== undefined ? Date.parse(input.dueDateTo) : Infinity;
+  return tasks.filter((t) => {
+    if (!t.dueDate) return false;
+    const due = Date.parse(t.dueDate);
+    return Number.isFinite(due) && due >= from && due <= to;
+  });
 }
 
 export async function addNote(env: GHLApiEnv, contactId: string, body: string): Promise<Note | unknown> {

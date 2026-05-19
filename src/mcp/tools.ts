@@ -81,11 +81,12 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
   search_tasks:
     "Search GoHighLevel tasks across all contacts with filters. " +
     "Use this to build daily / weekly follow-up views — pass completed: false to see open tasks, " +
-    "filter by assignedTo (a GHL user ID or 'me') and dueDateFrom / dueDateTo (ISO 8601 with timezone) " +
-    "to scope to a date window. Optionally filter by a single contactId or free-text query. " +
-    "Returns an array of tasks each with id, title, body, dueDate, completed, assignedTo, and contactId — " +
-    "everything a follow-up workflow needs without per-contact roundtrips. " +
-    "Default page size is GHL's default; pass limit (1–100) to override.",
+    "filter by assignedTo (a GHL user ID or 'me'), and optionally by a single contactId or free-text query. " +
+    "dueDateFrom / dueDateTo (ISO 8601 with timezone) scope to a due-date window — note that GHL itself " +
+    "doesn't filter by due date server-side, so this is applied client-side after the GHL fetch: " +
+    "if you use a date window, increase limit accordingly so you don't miss matches buried past the first page. " +
+    "Returns an array of tasks each with id, title, body, dueDate, completed, assignedTo, and contactId. " +
+    "limit defaults to GHL's default (25), max 100. Use skip for pagination — fetch additional pages of GHL results.",
 
   list_tasks:
     "List all tasks attached to a single GoHighLevel contact. " +
