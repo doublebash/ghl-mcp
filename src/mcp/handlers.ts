@@ -4,6 +4,7 @@ import {
   addNote,
   addTag,
   addTask,
+  completeTask,
   createContact,
   deleteNote,
   getContact,
@@ -72,6 +73,9 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
   add_tag: (env, { contactId, tags }) => addTag(env, contactId, tags),
 
   add_task: (env, { contactId, title, dueDate, body }) => addTask(env, contactId, title, dueDate, body),
+
+  complete_task: (env, { contactId, taskId, completed }) =>
+    completeTask(env, contactId, taskId, completed ?? true),
 
   add_note: (env, { contactId, body }) => addNote(env, contactId, body),
 

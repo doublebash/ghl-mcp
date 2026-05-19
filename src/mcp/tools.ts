@@ -72,6 +72,12 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     "Use this to set a reminder to call, email, or follow up with someone by a specific date. " +
     "Tasks appear in GHL's task list and are assigned to you. Requires a contact ID and due date.",
 
+  complete_task:
+    "Mark a GoHighLevel task as done (or un-done). " +
+    "Use this once a follow-up has been completed so it drops off the task list. " +
+    "Pass completed: false to reopen a task that was closed by mistake. " +
+    "Defaults to completed: true. Requires a contact ID and task ID.",
+
   add_note:
     "Append a note to a GoHighLevel contact record. " +
     "Use this to log a call summary, record what was discussed in a meeting, or save research about a contact. " +

@@ -1,5 +1,5 @@
 export const SERVER_NAME = "ghl-mcp";
-export const SERVER_VERSION = "2.1.0";
+export const SERVER_VERSION = "2.2.0";
 
 export const GHL_BASE_URL = "https://services.leadconnectorhq.com";
 export const GHL_API_VERSION = "2021-07-28";
@@ -25,6 +25,13 @@ export const ALLOWED_REDIRECT_HOSTS = new Set<string>([
   "api.claude.ai",
   "claude.com",
   "api.claude.com",
+  // Claude Code Desktop uses http://localhost:<port>/callback for OAuth
+  // (RFC 8252 native-app pattern). Localhost is only reachable from this
+  // machine, so the token cannot be intercepted by remote attackers.
+  "localhost",
+  "127.0.0.1",
 ]);
+
+export const ALLOWED_REDIRECT_SCHEMES = new Set<string>(["https:", "http:"]);
 
 export const OPPORTUNITY_PAGE_HARD_CAP = 500;

@@ -63,6 +63,20 @@ export async function addTask(
   return data?.task ?? data;
 }
 
+export async function completeTask(
+  env: GHLApiEnv,
+  contactId: string,
+  taskId: string,
+  completed: boolean,
+): Promise<Task | unknown> {
+  const data = await ghlFetch<{ task?: Task }>(env, {
+    method: "PUT",
+    path: buildPath("/contacts/{contactId}/tasks/{taskId}/completed", { contactId, taskId }),
+    body: { completed },
+  });
+  return data?.task ?? data;
+}
+
 export async function addNote(env: GHLApiEnv, contactId: string, body: string): Promise<Note | unknown> {
   const data = await ghlFetch<{ note?: Note }>(env, {
     method: "POST",

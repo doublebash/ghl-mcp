@@ -103,6 +103,12 @@ export const toolSchemas = {
     body: limitedString(8192).optional(),
   }),
 
+  complete_task: z.object({
+    contactId: ghlId,
+    taskId: ghlId,
+    completed: z.boolean().optional(),
+  }),
+
   add_note: z.object({
     contactId: ghlId,
     body: limitedString(16_384),
