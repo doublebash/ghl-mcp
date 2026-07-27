@@ -134,6 +134,63 @@ describe("creates carry the configured location", () => {
   });
 });
 
+describe("list results declare their own completeness", () => {
+  it("search_contacts wraps results and defaults the page size", async () => {
+    stub = stubGhl({ "/contacts/": { contacts: [{ id: "c1" }, { id: "c2" }] } });
+    const result = (await dispatchToolCall(TEST_ENV, "search_contacts", { query: "sam" })) as {
+      items: unknown[];
+      total: number;
+      truncated: boolean;
+    };
+
+    expect(result.items.length).toBe(2);
+    expect(result.total).toBe(2);
+    expect(result.truncated).toBe(false);
+    expect(stub.only().query.get("limit")).toBe("25");
+  });
+
+  it("search_contacts forwards an explicit limit and skip to GHL", async () => {
+    stub = stubGhl({ "/contacts/": { contacts: [] } });
+    await dispatchToolCall(TEST_ENV, "search_contacts", { query: "sam", limit: 50, skip: 100 });
+
+    const call = stub.only();
+    expect(call.query.get("limit")).toBe("50");
+    expect(call.query.get("skip")).toBe("100");
+  });
+
+  it("get_opportunities trims a large pipeline and says so", async () => {
+    stub = stubGhl({
+      "/opportunities/search": {
+        opportunities: Array.from({ length: 380 }, (_, i) => ({ id: `o${i}` })),
+        meta: { nextPageUrl: null },
+      },
+    });
+    const result = (await dispatchToolCall(TEST_ENV, "get_opportunities", {})) as {
+      items: unknown[];
+      returned: number;
+      total: number;
+      truncated: boolean;
+      note?: string;
+    };
+
+    expect(result.returned).toBe(100);
+    expect(result.total).toBe(380);
+    expect(result.truncated).toBe(true);
+    expect(result.note).toContain("partial");
+  });
+
+  it("search_tasks wraps its results too", async () => {
+    stub = stubGhl({ "/locations/loc123/tasks/search": { tasks: [{ id: "t1" }] } });
+    const result = (await dispatchToolCall(TEST_ENV, "search_tasks", {})) as {
+      items: unknown[];
+      truncated: boolean;
+    };
+
+    expect(result.items.length).toBe(1);
+    expect(result.truncated).toBe(false);
+  });
+});
+
 describe("upstream failures surface as safe errors", () => {
   it("get_contact reports not-found without echoing the GHL body", async () => {
     stub = stubGhl({ "/contacts/missing": () => new Response("{}", { status: 200 }) });

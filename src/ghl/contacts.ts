@@ -16,11 +16,25 @@ export interface CreateContactInput {
   customFields?: { id: string; field_value: string }[];
 }
 
-export async function searchContacts(env: GHLApiEnv, query: string): Promise<ContactSummary[]> {
+export interface SearchContactsOptions {
+  limit?: number;
+  skip?: number;
+}
+
+export async function searchContacts(
+  env: GHLApiEnv,
+  query: string,
+  options: SearchContactsOptions = {},
+): Promise<ContactSummary[]> {
   const data = await ghlFetch<{ contacts?: ContactSummary[] }>(env, {
     method: "GET",
     path: "/contacts/",
-    query: { locationId: env.GHL_LOCATION_ID, query },
+    query: {
+      locationId: env.GHL_LOCATION_ID,
+      query,
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.skip !== undefined ? { skip: options.skip } : {}),
+    },
   });
   return data?.contacts ?? [];
 }

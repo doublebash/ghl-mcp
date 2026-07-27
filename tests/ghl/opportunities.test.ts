@@ -54,6 +54,30 @@ describe("pagination", () => {
     expect(fetched).toBe(5);
   });
 
+  // A record cap alone assumes pages are reasonably full. With tiny pages it
+  // would allow hundreds of sequential round-trips inside one tool call.
+  it("stops at the page budget even when far short of the record cap", async () => {
+    let requests = 0;
+    const all = await fetchAllPages<{ id: number }>(
+      async () => {
+        requests += 1;
+        return { items: [{ id: requests }], hasMore: true };
+      },
+      { hardCap: 500, maxPages: 25 },
+    );
+
+    expect(requests).toBe(25);
+    expect(all.length).toBe(25);
+  });
+
+  it("still accepts a bare numeric hard cap from older callers", async () => {
+    const all = await fetchAllPages<{ id: number }>(
+      async (page) => ({ items: [{ id: page }], hasMore: page < 3 }),
+      10,
+    );
+    expect(all.map((o) => o.id)).toEqual([1, 2, 3]);
+  });
+
   it("passes filters through as GHL's snake_case query parameters", async () => {
     stub = stubGhl({ [SEARCH]: page([], false) });
     await getOpportunities(TEST_ENV, {

@@ -1,6 +1,6 @@
 export const SERVER_NAME = "ghl-mcp";
 // Keep in lockstep with package.json — tests/mcp/schemas.test.ts asserts they match.
-export const SERVER_VERSION = "2.4.0";
+export const SERVER_VERSION = "2.5.0";
 
 export const GHL_BASE_URL = "https://services.leadconnectorhq.com";
 export const GHL_API_VERSION = "2021-07-28";
@@ -40,3 +40,17 @@ export const ALLOWED_REDIRECT_HOSTS = new Set<string>([
 export const ALLOWED_REDIRECT_SCHEMES = new Set<string>(["https:", "http:"]);
 
 export const OPPORTUNITY_PAGE_HARD_CAP = 500;
+
+// Independent of the record cap: bounds how many sequential upstream requests a
+// single tool call may issue. Without it, a small page size could turn one call
+// into hundreds of round-trips against Workers' subrequest budget.
+export const OPPORTUNITY_MAX_PAGES = 25;
+
+export const DEFAULT_CONTACT_SEARCH_LIMIT = 25;
+export const MIN_CONTACT_SEARCH_LIMIT = 1;
+export const MAX_CONTACT_SEARCH_LIMIT = 100;
+
+// Ceiling on how many records any one tool hands back. Results above this are
+// trimmed and the response says so explicitly, so the model is never left to
+// assume a truncated list was the whole list.
+export const MAX_RESULT_ITEMS = 100;

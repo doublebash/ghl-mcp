@@ -29,9 +29,11 @@ import {
 import { listWorkflows, triggerWorkflow } from "../ghl/workflows.js";
 import {
   DEFAULT_APPOINTMENT_LOOKAHEAD_DAYS,
+  DEFAULT_CONTACT_SEARCH_LIMIT,
   DEFAULT_CONVERSATION_LIMIT,
 } from "../constants.js";
 import type { ToolArgs, ToolName } from "./schemas.js";
+import { truncateList } from "./truncate.js";
 
 /** Maps the caller's "me" shorthand onto the configured GHL user. */
 function resolveAssignedTo(env: GHLApiEnv, value: string): string {
@@ -59,7 +61,16 @@ function compact<T extends object>(input: T): { [K in keyof T]?: Exclude<T[K], u
 type Handler<N extends ToolName> = (env: GHLApiEnv, args: ToolArgs<N>) => Promise<unknown>;
 
 export const HANDLERS: { [N in ToolName]: Handler<N> } = {
-  search_contacts: (env, { query }) => searchContacts(env, query),
+  search_contacts: async (env, { query, limit, skip }) =>
+    truncateList(
+      await searchContacts(
+        env,
+        query,
+        compact({ limit: limit ?? DEFAULT_CONTACT_SEARCH_LIMIT, skip }),
+      ),
+      "matching contacts",
+      "Narrow the query, or page through with skip.",
+    ),
 
   get_contact: (env, { contactId }) => getContact(env, contactId),
 
@@ -89,13 +100,17 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
   complete_task: (env, { contactId, taskId, completed }) =>
     completeTask(env, contactId, taskId, completed ?? true),
 
-  search_tasks: (env, args) =>
-    searchTasks(
-      env,
-      compact({
-        ...args,
-        assignedTo: args.assignedTo && resolveAssignedTo(env, args.assignedTo),
-      }),
+  search_tasks: async (env, args) =>
+    truncateList(
+      await searchTasks(
+        env,
+        compact({
+          ...args,
+          assignedTo: args.assignedTo && resolveAssignedTo(env, args.assignedTo),
+        }),
+      ),
+      "matching tasks",
+      "Narrow with completed, assignedTo or a due-date window, or page with skip.",
     ),
 
   list_tasks: (env, { contactId }) => listTasks(env, contactId),
@@ -123,13 +138,17 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
 
   delete_note: (env, { contactId, noteId }) => deleteNote(env, contactId, noteId),
 
-  get_opportunities: (env, args) =>
-    getOpportunities(
-      env,
-      compact({
-        ...args,
-        assignedTo: args.assignedTo && resolveAssignedTo(env, args.assignedTo),
-      }),
+  get_opportunities: async (env, args) =>
+    truncateList(
+      await getOpportunities(
+        env,
+        compact({
+          ...args,
+          assignedTo: args.assignedTo && resolveAssignedTo(env, args.assignedTo),
+        }),
+      ),
+      "matching opportunities",
+      "Filter by pipelineId, stageId, status or a value range to see a complete set.",
     ),
 
   get_opportunity: (env, { opportunityId }) => getOpportunity(env, opportunityId),

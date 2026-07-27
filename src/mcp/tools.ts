@@ -7,14 +7,19 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
   search_contacts:
     "Search for contacts in GoHighLevel by name, email, phone number, or company name. " +
     "Use this first when you need to find a specific person before reading or updating their record. " +
-    "Returns a list of matching contacts with their IDs, names, emails, phone numbers, company, and tags.",
+    "Returns { items, returned, total, truncated } — items holds the matching contacts with their IDs, " +
+    "names, emails, phone numbers, company and tags. limit defaults to 25 (max 100); use skip to page. " +
+    "If truncated is true the list is partial — read the note and narrow the query rather than treating it as complete.",
 
   get_opportunities:
     "Get a list of opportunities (deals) from GoHighLevel pipelines. " +
     "Supports filtering by pipeline, stage, status (open/won/lost/abandoned), assigned user (a GHL user ID or 'me'), " +
     "value range, and stale deals (staleDays: no activity in X days — deals with no activity date at all are excluded). " +
     "Use this for pipeline reviews, finding stalled deals, or identifying high-value opportunities that need attention. " +
-    "All filters are optional — omit them to get all open opportunities. Returns at most 500 deals.",
+    "All filters are optional — omit them to get all open opportunities. " +
+    "Returns { items, returned, total, truncated }: at most 100 deals in items, drawn from at most 500 fetched. " +
+    "If truncated is true you are seeing part of the pipeline — do not total or summarise it as the whole; " +
+    "add a filter and call again.",
 
   get_opportunity:
     "Get the full details of a single opportunity (deal) by its ID. " +
@@ -91,7 +96,9 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     "dueDateFrom / dueDateTo (ISO 8601 with timezone) scope to a due-date window — note that GHL itself " +
     "doesn't filter by due date server-side, so this is applied client-side after the GHL fetch: " +
     "if you use a date window, increase limit accordingly so you don't miss matches buried past the first page. " +
-    "Returns an array of tasks each with id, title, body, dueDate, completed, assignedTo, and contactId. " +
+    "Returns { items, returned, total, truncated }; each task in items has id, title, body, dueDate, completed, " +
+    "assignedTo and contactId. If truncated is true the list is partial — narrow the filters rather than " +
+    "treating it as every open task. " +
     "limit defaults to GHL's default (25), max 100. Use skip for pagination — fetch additional pages of GHL results.",
 
   list_tasks:

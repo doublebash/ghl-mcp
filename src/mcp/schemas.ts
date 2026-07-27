@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
   GHL_ID_PATTERN,
   MAX_APPOINTMENT_LOOKAHEAD_DAYS,
+  MAX_CONTACT_SEARCH_LIMIT,
   MAX_CONVERSATION_LIMIT,
   MIN_APPOINTMENT_LOOKAHEAD_DAYS,
+  MIN_CONTACT_SEARCH_LIMIT,
   MIN_CONVERSATION_LIMIT,
   OPPORTUNITY_STATUSES,
 } from "../constants.js";
@@ -40,6 +42,13 @@ const customFieldList = z
 export const toolSchemas = {
   search_contacts: z.object({
     query: limitedString(256),
+    limit: z
+      .number()
+      .int()
+      .min(MIN_CONTACT_SEARCH_LIMIT)
+      .max(MAX_CONTACT_SEARCH_LIMIT)
+      .optional(),
+    skip: z.number().int().min(0).max(10_000).optional(),
   }),
 
   get_opportunities: z.object({
