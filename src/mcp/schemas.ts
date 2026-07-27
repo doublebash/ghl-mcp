@@ -9,11 +9,33 @@ import {
 } from "../constants.js";
 
 const ghlId = z.string().regex(GHL_ID_PATTERN, "must match GHL ID format");
-const isoDateTime = z.string().min(1).max(64);
+
+// Must actually be a date, not merely a short string. Without the refine, input
+// like "next Tuesday" reached Date.parse downstream, became NaN, and silently
+// filtered every result away — an empty list reads as "nothing found" rather
+// than "that isn't a date".
+const isoDateTime = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine((v) => Number.isFinite(Date.parse(v)), {
+    message: "must be an ISO 8601 date-time, e.g. 2026-08-01T09:00:00+12:00",
+  });
+
 const monetaryValue = z.number().finite().min(0).max(1_000_000_000);
 const limitedString = (max: number) => z.string().min(1).max(max);
 const tagList = z.array(z.string().min(1).max(128)).max(50);
 const opportunityStatus = z.enum(OPPORTUNITY_STATUSES);
+
+// GHL custom fields are addressed by field id, with the value always a string.
+const customFieldList = z
+  .array(
+    z.object({
+      id: ghlId,
+      field_value: z.string().max(4096),
+    }),
+  )
+  .max(50);
 
 export const toolSchemas = {
   search_contacts: z.object({
@@ -83,13 +105,19 @@ export const toolSchemas = {
       .optional(),
   }),
 
-  add_appointment: z.object({
-    contactId: ghlId,
-    title: limitedString(256),
-    startTime: isoDateTime,
-    endTime: isoDateTime,
-    calendarId: ghlId.optional(),
-  }),
+  add_appointment: z
+    .object({
+      contactId: ghlId,
+      title: limitedString(256),
+      startTime: isoDateTime,
+      endTime: isoDateTime,
+      calendarId: ghlId.optional(),
+    })
+    // GHL accepts a backwards appointment and stores it; catch it here instead.
+    .refine((v) => Date.parse(v.endTime) > Date.parse(v.startTime), {
+      message: "endTime must be after startTime",
+      path: ["endTime"],
+    }),
 
   add_tag: z.object({
     contactId: ghlId,
@@ -109,16 +137,24 @@ export const toolSchemas = {
     completed: z.boolean().optional(),
   }),
 
-  search_tasks: z.object({
-    completed: z.boolean().optional(),
-    contactId: ghlId.optional(),
-    assignedTo: limitedString(128).optional(),
-    query: limitedString(256).optional(),
-    dueDateFrom: isoDateTime.optional(),
-    dueDateTo: isoDateTime.optional(),
-    limit: z.number().int().min(1).max(100).optional(),
-    skip: z.number().int().min(0).max(10_000).optional(),
-  }),
+  search_tasks: z
+    .object({
+      completed: z.boolean().optional(),
+      contactId: ghlId.optional(),
+      assignedTo: limitedString(128).optional(),
+      query: limitedString(256).optional(),
+      dueDateFrom: isoDateTime.optional(),
+      dueDateTo: isoDateTime.optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+      skip: z.number().int().min(0).max(10_000).optional(),
+    })
+    .refine(
+      (v) =>
+        v.dueDateFrom === undefined ||
+        v.dueDateTo === undefined ||
+        Date.parse(v.dueDateTo) >= Date.parse(v.dueDateFrom),
+      { message: "dueDateTo must not be before dueDateFrom", path: ["dueDateTo"] },
+    ),
 
   list_tasks: z.object({
     contactId: ghlId,
@@ -173,6 +209,7 @@ export const toolSchemas = {
     source: limitedString(128).optional(),
     tags: tagList.optional(),
     assignedTo: limitedString(128).optional(),
+    customFields: customFieldList.optional(),
   }),
 
   create_contact: z.object({
@@ -184,6 +221,7 @@ export const toolSchemas = {
     source: limitedString(128).optional(),
     tags: tagList.optional(),
     assignedTo: limitedString(128).optional(),
+    customFields: customFieldList.optional(),
   }),
 
   get_contact: z.object({

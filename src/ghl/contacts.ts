@@ -211,10 +211,13 @@ export async function updateNote(
   noteId: string,
   body: string,
 ): Promise<Note | unknown> {
+  // Only the body is sent. Passing userId here would re-stamp authorship on
+  // every edit, quietly reassigning a colleague's note to whoever holds the
+  // API token. Authorship belongs to whoever created the note.
   const data = await ghlFetch<{ note?: Note }>(env, {
     method: "PUT",
     path: buildPath("/contacts/{contactId}/notes/{noteId}", { contactId, noteId }),
-    body: { body, userId: env.GHL_USER_ID },
+    body: { body },
   });
   return data?.note ?? data;
 }

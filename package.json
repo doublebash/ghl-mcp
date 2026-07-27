@@ -1,6 +1,6 @@
 {
   "name": "ghl-mcp",
-  "version": "2.1.0",
+  "version": "2.4.0",
   "description": "Cloudflare Workers Model Context Protocol server bridging Claude to the GoHighLevel CRM. Hardened, OAuth-compliant, per-client bearer tokens. Built on @bashco/mcp-toolkit.",
   "keywords": [
     "mcp",

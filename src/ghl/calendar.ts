@@ -8,20 +8,41 @@ export interface UpcomingOptions {
   daysAhead: number;
 }
 
+/**
+ * Keep only appointments starting inside [from, to].
+ *
+ * The per-contact GHL endpoint returns a contact's entire appointment history
+ * with no date parameters, so the window has to be applied here — otherwise a
+ * tool called "upcoming" hands back appointments from years ago. An entry whose
+ * startTime is missing or unparseable is dropped: it cannot be shown to be
+ * upcoming, and guessing would put stale rows back in the answer.
+ */
+function withinWindow(appointments: Appointment[], from: number, to: number): Appointment[] {
+  return appointments.filter((a) => {
+    if (!a.startTime) return false;
+    const start = Date.parse(a.startTime);
+    return Number.isFinite(start) && start >= from && start <= to;
+  });
+}
+
 export async function getUpcomingAppointments(
   env: GHLApiEnv,
   options: UpcomingOptions,
 ): Promise<Appointment[]> {
+  const now = Date.now();
+  const end = now + options.daysAhead * 24 * 60 * 60 * 1000;
+
   if (options.contactId !== undefined) {
-    const data = await ghlFetch<{ appointments?: Appointment[] }>(env, {
+    const data = await ghlFetch<{ appointments?: Appointment[]; events?: Appointment[] }>(env, {
       method: "GET",
       path: buildPath("/contacts/{contactId}/appointments", { contactId: options.contactId }),
     });
-    return data?.appointments ?? [];
+    const all = data?.appointments ?? data?.events ?? [];
+    return withinWindow(all, now, end).sort(
+      (a, b) => Date.parse(a.startTime ?? "") - Date.parse(b.startTime ?? ""),
+    );
   }
 
-  const now = Date.now();
-  const end = now + options.daysAhead * 24 * 60 * 60 * 1000;
   const data = await ghlFetch<{ events?: Appointment[] }>(env, {
     method: "GET",
     path: "/calendars/events",

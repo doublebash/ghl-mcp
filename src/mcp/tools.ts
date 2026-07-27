@@ -11,9 +11,10 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
 
   get_opportunities:
     "Get a list of opportunities (deals) from GoHighLevel pipelines. " +
-    "Supports filtering by pipeline, stage, status (open/won/lost/abandoned), assigned user, value range, and stale deals (no activity in X days). " +
+    "Supports filtering by pipeline, stage, status (open/won/lost/abandoned), assigned user (a GHL user ID or 'me'), " +
+    "value range, and stale deals (staleDays: no activity in X days — deals with no activity date at all are excluded). " +
     "Use this for pipeline reviews, finding stalled deals, or identifying high-value opportunities that need attention. " +
-    "All filters are optional — omit them to get all open opportunities.",
+    "All filters are optional — omit them to get all open opportunities. Returns at most 500 deals.",
 
   get_opportunity:
     "Get the full details of a single opportunity (deal) by its ID. " +
@@ -50,10 +51,15 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
   get_upcoming_appointments:
     "Get upcoming calendar appointments from GoHighLevel. " +
     "Can fetch appointments for a specific contact, or show all upcoming appointments across your calendar. " +
-    "Defaults to the next 30 days. Use this to check what's scheduled before a meeting or to get a weekly overview.",
+    "Defaults to the next 30 days (daysAhead, 1-365) and applies to both modes — past appointments are never returned, " +
+    "so this is not a way to read a contact's appointment history. Results are ordered earliest first. " +
+    "Use this to check what's scheduled before a meeting or to get a weekly overview.",
 
   get_conversation_history:
     "Get the recent message history for a GoHighLevel contact — includes emails, SMS, calls, and other communications. " +
+    "A contact's SMS and email are separate threads in GHL, so this merges the 3 most recently active threads into one " +
+    "timeline, newest message first, each message tagged with its conversationId. " +
+    "The response reports conversationCount and truncated: true when the contact has more threads than were merged. " +
     "Use this to understand the last time you spoke with someone, what was discussed, and what channel was used. " +
     "Essential context before drafting a follow-up. Requires a contact ID.",
 
@@ -135,12 +141,15 @@ const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
   update_contact:
     "Update an existing GoHighLevel contact's details. " +
     "This modifies existing data — only the fields you provide will be changed; omitted fields are left as-is. " +
-    "Use this to correct information, add a phone number, update a company name, change custom fields, or assign the contact to a user. " +
+    "Use this to correct information, add a phone number, update a company name, or assign the contact to a user " +
+    "(assignedTo: a GHL user ID or 'me'). " +
+    "customFields takes [{ id, field_value }] — get the field IDs from a get_contact call on any contact that has them set. " +
     "Requires a contact ID — run search_contacts first if you only have a name.",
 
   create_contact:
     "Create a new contact in GoHighLevel. " +
     "Use this when researching a person or company and adding them to the CRM, or when a new lead needs to be created manually. " +
+    "customFields takes [{ id, field_value }] — get the field IDs from a get_contact call on any contact that has them set. " +
     "Returns the created contact including their new GHL contact ID.",
 
   get_contact:

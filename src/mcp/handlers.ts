@@ -33,11 +33,27 @@ import {
 } from "../constants.js";
 import type { ToolArgs, ToolName } from "./schemas.js";
 
-function resolveAssignedTo(env: GHLApiEnv, value: string | undefined): string | undefined {
-  if (value === undefined || value === "") return undefined;
+/** Maps the caller's "me" shorthand onto the configured GHL user. */
+function resolveAssignedTo(env: GHLApiEnv, value: string): string {
   const v = value.trim();
-  if (v.toLowerCase() === "me") return env.GHL_USER_ID;
-  return v;
+  return v.toLowerCase() === "me" ? env.GHL_USER_ID : v;
+}
+
+/**
+ * Drop undefined entries so the upstream body carries only fields the caller
+ * actually set — a PUT with `{ email: undefined }` would blank the field.
+ *
+ * `exactOptionalPropertyTypes` is what forces this: an explicit `undefined` is
+ * not assignable to an optional property, so every field previously needed its
+ * own `...(x !== undefined ? { x } : {})` spread. One pass here replaces about
+ * sixty lines of that.
+ */
+function compact<T extends object>(input: T): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out as { [K in keyof T]?: Exclude<T[K], undefined> };
 }
 
 type Handler<N extends ToolName> = (env: GHLApiEnv, args: ToolArgs<N>) => Promise<unknown>;
@@ -48,32 +64,23 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
   get_contact: (env, { contactId }) => getContact(env, contactId),
 
   create_contact: (env, args) =>
-    createContact(env, {
-      ...(args.firstName !== undefined ? { firstName: args.firstName } : {}),
-      ...(args.lastName !== undefined ? { lastName: args.lastName } : {}),
-      ...(args.email !== undefined ? { email: args.email } : {}),
-      ...(args.phone !== undefined ? { phone: args.phone } : {}),
-      ...(args.companyName !== undefined ? { companyName: args.companyName } : {}),
-      ...(args.source !== undefined ? { source: args.source } : {}),
-      ...(args.tags !== undefined ? { tags: args.tags } : {}),
-      ...(args.assignedTo !== undefined
-        ? { assignedTo: resolveAssignedTo(env, args.assignedTo) ?? args.assignedTo }
-        : {}),
-    }),
+    createContact(
+      env,
+      compact({
+        ...args,
+        assignedTo: args.assignedTo && resolveAssignedTo(env, args.assignedTo),
+      }),
+    ),
 
   update_contact: (env, { contactId, ...rest }) =>
-    updateContact(env, contactId, {
-      ...(rest.firstName !== undefined ? { firstName: rest.firstName } : {}),
-      ...(rest.lastName !== undefined ? { lastName: rest.lastName } : {}),
-      ...(rest.email !== undefined ? { email: rest.email } : {}),
-      ...(rest.phone !== undefined ? { phone: rest.phone } : {}),
-      ...(rest.companyName !== undefined ? { companyName: rest.companyName } : {}),
-      ...(rest.source !== undefined ? { source: rest.source } : {}),
-      ...(rest.tags !== undefined ? { tags: rest.tags } : {}),
-      ...(rest.assignedTo !== undefined
-        ? { assignedTo: resolveAssignedTo(env, rest.assignedTo) ?? rest.assignedTo }
-        : {}),
-    }),
+    updateContact(
+      env,
+      contactId,
+      compact({
+        ...rest,
+        assignedTo: rest.assignedTo && resolveAssignedTo(env, rest.assignedTo),
+      }),
+    ),
 
   add_tag: (env, { contactId, tags }) => addTag(env, contactId, tags),
 
@@ -83,32 +90,28 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
     completeTask(env, contactId, taskId, completed ?? true),
 
   search_tasks: (env, args) =>
-    searchTasks(env, {
-      ...(args.completed !== undefined ? { completed: args.completed } : {}),
-      ...(args.contactId !== undefined ? { contactId: args.contactId } : {}),
-      ...(args.assignedTo !== undefined
-        ? { assignedTo: resolveAssignedTo(env, args.assignedTo) ?? args.assignedTo }
-        : {}),
-      ...(args.query !== undefined ? { query: args.query } : {}),
-      ...(args.dueDateFrom !== undefined ? { dueDateFrom: args.dueDateFrom } : {}),
-      ...(args.dueDateTo !== undefined ? { dueDateTo: args.dueDateTo } : {}),
-      ...(args.limit !== undefined ? { limit: args.limit } : {}),
-      ...(args.skip !== undefined ? { skip: args.skip } : {}),
-    }),
+    searchTasks(
+      env,
+      compact({
+        ...args,
+        assignedTo: args.assignedTo && resolveAssignedTo(env, args.assignedTo),
+      }),
+    ),
 
   list_tasks: (env, { contactId }) => listTasks(env, contactId),
 
   get_task: (env, { contactId, taskId }) => getTask(env, contactId, taskId),
 
   update_task: (env, { contactId, taskId, ...rest }) =>
-    updateTask(env, contactId, taskId, {
-      ...(rest.title !== undefined ? { title: rest.title } : {}),
-      ...(rest.body !== undefined ? { body: rest.body } : {}),
-      ...(rest.dueDate !== undefined ? { dueDate: rest.dueDate } : {}),
-      ...(rest.assignedTo !== undefined
-        ? { assignedTo: resolveAssignedTo(env, rest.assignedTo) ?? rest.assignedTo }
-        : {}),
-    }),
+    updateTask(
+      env,
+      contactId,
+      taskId,
+      compact({
+        ...rest,
+        assignedTo: rest.assignedTo && resolveAssignedTo(env, rest.assignedTo),
+      }),
+    ),
 
   delete_task: (env, { contactId, taskId }) => deleteTask(env, contactId, taskId),
 
@@ -121,41 +124,39 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
   delete_note: (env, { contactId, noteId }) => deleteNote(env, contactId, noteId),
 
   get_opportunities: (env, args) =>
-    getOpportunities(env, {
-      ...(args.pipelineId !== undefined ? { pipelineId: args.pipelineId } : {}),
-      ...(args.stageId !== undefined ? { stageId: args.stageId } : {}),
-      ...(args.status !== undefined ? { status: args.status } : {}),
-      ...(args.assignedTo !== undefined ? { assignedTo: args.assignedTo } : {}),
-      ...(args.minValue !== undefined ? { minValue: args.minValue } : {}),
-      ...(args.maxValue !== undefined ? { maxValue: args.maxValue } : {}),
-      ...(args.staleDays !== undefined ? { staleDays: args.staleDays } : {}),
-    }),
+    getOpportunities(
+      env,
+      compact({
+        ...args,
+        assignedTo: args.assignedTo && resolveAssignedTo(env, args.assignedTo),
+      }),
+    ),
 
   get_opportunity: (env, { opportunityId }) => getOpportunity(env, opportunityId),
 
   create_opportunity: (env, args) =>
     createOpportunity(env, {
+      ...compact({
+        ...args,
+        assignedTo: args.assignedTo && resolveAssignedTo(env, args.assignedTo),
+      }),
+      // Required by CreateOpportunityInput — restated so compact()'s all-optional
+      // return type still satisfies it.
       name: args.name,
       pipelineId: args.pipelineId,
       stageId: args.stageId,
       contactId: args.contactId,
-      ...(args.monetaryValue !== undefined ? { monetaryValue: args.monetaryValue } : {}),
-      ...(args.status !== undefined ? { status: args.status } : {}),
-      ...(args.assignedTo !== undefined
-        ? { assignedTo: resolveAssignedTo(env, args.assignedTo) ?? args.assignedTo }
-        : {}),
     }),
 
   update_opportunity: (env, { opportunityId, ...rest }) =>
-    updateOpportunity(env, opportunityId, {
-      ...(rest.name !== undefined ? { name: rest.name } : {}),
-      ...(rest.stageId !== undefined ? { stageId: rest.stageId } : {}),
-      ...(rest.status !== undefined ? { status: rest.status } : {}),
-      ...(rest.monetaryValue !== undefined ? { monetaryValue: rest.monetaryValue } : {}),
-      ...(rest.assignedTo !== undefined
-        ? { assignedTo: resolveAssignedTo(env, rest.assignedTo) ?? rest.assignedTo }
-        : {}),
-    }),
+    updateOpportunity(
+      env,
+      opportunityId,
+      compact({
+        ...rest,
+        assignedTo: rest.assignedTo && resolveAssignedTo(env, rest.assignedTo),
+      }),
+    ),
 
   get_pipelines: (env) => getPipelines(env),
 
@@ -166,7 +167,7 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
 
   get_upcoming_appointments: (env, args) =>
     getUpcomingAppointments(env, {
-      ...(args.contactId !== undefined ? { contactId: args.contactId } : {}),
+      ...compact({ contactId: args.contactId }),
       daysAhead: args.daysAhead ?? DEFAULT_APPOINTMENT_LOOKAHEAD_DAYS,
     }),
 

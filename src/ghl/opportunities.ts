@@ -74,7 +74,12 @@ export async function getOpportunities(
     const cutoff = Date.now() - filters.staleDays * 24 * 60 * 60 * 1000;
     results = results.filter((o) => {
       const last = o.lastActivityDate ?? o.updatedAt ?? o.createdAt;
-      return last !== undefined ? new Date(last).getTime() < cutoff : true;
+      if (last === undefined) return false;
+      const at = new Date(last).getTime();
+      // A deal we can't date can't be shown to have gone quiet. Excluding it
+      // keeps "nothing has happened in N days" answerable; the previous
+      // behaviour counted undated deals as stale and padded every result.
+      return Number.isFinite(at) && at < cutoff;
     });
   }
 

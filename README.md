@@ -2,13 +2,13 @@
 
 A hardened **Model Context Protocol** server bridging Claude to **GoHighLevel CRM**, deployed on **Cloudflare Workers**.
 
-Fork this repo, deploy to your own Cloudflare account, point Claude.ai at your worker, and Claude can read and write your GoHighLevel data through 20 typed tools (contacts, opportunities, conversations, appointments, workflows, tags, tasks, notes).
+Fork this repo, deploy to your own Cloudflare account, point Claude.ai at your worker, and Claude can read and write your GoHighLevel data through 26 typed tools (contacts, opportunities, conversations, appointments, workflows, tags, tasks, notes).
 
 Built on [`@bashco/mcp-toolkit`](https://github.com/doublebash/mcp-toolkit) — OAuth, per-client bearer tokens, rate limiting, structured logging, and typed tool dispatch are all handled by the shared library.
 
 ## What you get
 
-- **20 GHL tools** — contacts, opportunities, pipelines, conversations, appointments, workflows, tags, tasks, notes. Full live catalogue at the `tools/list` MCP endpoint after deploy.
+- **26 GHL tools** — contacts, opportunities, pipelines, conversations, appointments, workflows, tags, tasks, notes. Full live catalogue at the `tools/list` MCP endpoint after deploy.
 - **OAuth 2.0 + PKCE** authentication for Claude.ai
 - **Per-client bearer tokens** — each Claude connection gets a unique token; compromise of one affects only that client
 - **Cloudflare rate limiting** on `/approve`, `/token`, `/register`, `/mcp`
@@ -94,7 +94,7 @@ Wrangler prints your worker URL — something like `https://ghl-mcp.<your-accoun
 2. Server URL: `https://ghl-mcp.<your-account>.workers.dev/mcp`
 3. Claude.ai redirects you to your worker's `/authorize` page
 4. Paste your `MCP_APPROVAL_CODE` and confirm
-5. You're connected — Claude now has the 20 GHL tools available
+5. You're connected — Claude now has the 26 GHL tools available
 
 The approval-code step happens **once per Claude.ai client**. Subsequent requests use the per-client bearer issued during this flow.
 

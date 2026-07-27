@@ -1,7 +1,14 @@
 name = "ghl-mcp"
 main = "src/index.ts"
-compatibility_date = "2024-11-01"
+compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
+
+# Without this, Workers keeps no logs — the structured output from ToolError and
+# the upstream client is emitted and immediately discarded, so a production
+# failure leaves nothing to read afterwards.
+[observability]
+enabled = true
+head_sampling_rate = 1
 
 [vars]
 # Non-secret config. Populate ENVIRONMENT in [env.production.vars] etc. if you ever split envs.

@@ -1,5 +1,6 @@
 export const SERVER_NAME = "ghl-mcp";
-export const SERVER_VERSION = "2.3.0";
+// Keep in lockstep with package.json — tests/mcp/schemas.test.ts asserts they match.
+export const SERVER_VERSION = "2.4.0";
 
 export const GHL_BASE_URL = "https://services.leadconnectorhq.com";
 export const GHL_API_VERSION = "2021-07-28";
@@ -14,6 +15,10 @@ export const MAX_APPOINTMENT_LOOKAHEAD_DAYS = 365;
 export const DEFAULT_CONVERSATION_LIMIT = 20;
 export const MIN_CONVERSATION_LIMIT = 1;
 export const MAX_CONVERSATION_LIMIT = 100;
+
+// A contact's SMS and email threads are separate conversations, so history has
+// to span more than one. Capped because each thread costs a subrequest.
+export const MAX_MERGED_CONVERSATIONS = 3;
 
 export const GHL_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 
