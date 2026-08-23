@@ -19,6 +19,7 @@ import {
   updateTask,
 } from "../ghl/contacts.js";
 import { getConversationHistory } from "../ghl/conversations.js";
+import { listSocialAccounts } from "../ghl/social.js";
 import {
   createOpportunity,
   getOpportunities,
@@ -195,4 +196,11 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
 
   add_appointment: (env, { contactId, title, startTime, endTime, calendarId }) =>
     addAppointment(env, contactId, title, startTime, endTime, calendarId),
+
+  list_social_accounts: async (env) =>
+    truncateList(
+      await listSocialAccounts(env),
+      "connected social accounts",
+      "Disconnect accounts you no longer post to in the Social Planner.",
+    ),
 };

@@ -31,6 +31,7 @@ const expectedTools: ToolName[] = [
   "update_contact",
   "create_contact",
   "get_contact",
+  "list_social_accounts",
 ];
 
 describe("server metadata", () => {
@@ -42,7 +43,7 @@ describe("server metadata", () => {
 });
 
 describe("tool catalogue", () => {
-  it("declares the expected 26 tools", () => {
+  it("declares the expected 27 tools", () => {
     expect(toolDefinitions.length).toBe(expectedTools.length);
     const names = toolDefinitions.map((t) => t.name);
     for (const name of expectedTools) {

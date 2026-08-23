@@ -236,6 +236,8 @@ export const toolSchemas = {
   get_contact: z.object({
     contactId: ghlId,
   }),
+
+  list_social_accounts: z.object({}),
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;

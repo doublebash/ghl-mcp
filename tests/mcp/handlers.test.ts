@@ -214,3 +214,37 @@ describe("upstream failures surface as safe errors", () => {
     ).rejects.toMatchObject({ userMessage: "GHL error 403: forbidden" });
   });
 });
+
+describe("list_social_accounts", () => {
+  const CONFIGURED = [
+    { id: "672026bf28227a4ad848c4c9_loc123_110529568590140_page", platform: "facebook", name: "Page" },
+    { id: "6760e225ec34a09b7bbe13c3_loc123_UCUUuWuvLIuWlmoztI1CdzBg_profile", platform: "youtube", name: "Channel" },
+    { id: "tw-1", platform: "twitter", name: "@x" },
+  ];
+  const env = { ...TEST_ENV, GHL_SOCIAL_ACCOUNTS: JSON.stringify(CONFIGURED) };
+
+  it("returns a completeness-reporting list without any upstream call", async () => {
+    stub = stubGhl({});
+    const result = (await dispatchToolCall(env, "list_social_accounts", {})) as {
+      items: { id: string; platform: string; supported: boolean }[];
+      returned: number;
+      total: number;
+      truncated: boolean;
+    };
+
+    expect(stub.calls).toHaveLength(0);
+    expect(result.returned).toBe(3);
+    expect(result.total).toBe(3);
+    expect(result.truncated).toBe(false);
+    expect(result.items.map((a) => a.platform)).toEqual(["facebook", "youtube", "twitter"]);
+    // Connected in GHL, but this server has no post_to_twitter tool.
+    expect(result.items.find((a) => a.id === "tw-1")?.supported).toBe(false);
+  });
+
+  it("surfaces a configuration error rather than an empty list when unset", async () => {
+    stub = stubGhl({});
+    await expect(
+      dispatchToolCall({ ...TEST_ENV, GHL_SOCIAL_ACCOUNTS: "" }, "list_social_accounts", {}),
+    ).rejects.toMatchObject({ status: 500 });
+  });
+});

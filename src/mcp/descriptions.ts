@@ -160,4 +160,14 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     "Get the full details of a single GoHighLevel contact by their ID. " +
     "Use this after search_contacts to get complete information including custom fields, tags, source, and attribution. " +
     "Requires a contact ID — run search_contacts first if you only have a name or email.",
+
+  list_social_accounts:
+    "List the social media accounts connected to GoHighLevel's Social Planner — Facebook, " +
+    "Instagram, YouTube, LinkedIn and TikTok — each with its account ID, platform and name. " +
+    "ALWAYS run this first before any post_to_* tool: those tools require explicit account IDs, " +
+    "and reject an ID belonging to a different platform. " +
+    "Accounts marked supported: false are connected to GoHighLevel but have no posting tool here. " +
+    "Returns { items, returned, total, truncated }. " +
+    "If this reports a configuration error, the account list has not been set up on the server " +
+    "yet — that is an operator task, not something to work around by guessing account IDs.",
 };
