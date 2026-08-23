@@ -18,3 +18,4 @@ dist/
 Thumbs.db
 
 coverage/
+tests/fixtures/social/
