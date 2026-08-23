@@ -8,6 +8,7 @@ import {
   GHL_BASE_URL,
   SOCIAL_API_VERSION,
   SOCIAL_PLATFORMS,
+  SOCIAL_POST_LIST_LIMIT,
   type AuthorableStatus,
   type SocialPlatform,
 } from "../constants.js";
@@ -202,4 +203,138 @@ export async function createPost(env: GHLApiEnv, input: CreatePostInput): Promis
     });
   }
   return post;
+}
+
+const POST_TEMPLATE = "/social-media-posting/{locationId}/posts/{postId}";
+
+export interface ListPostFilters {
+  platform?: SocialPlatform;
+  /** Mapped onto GHL's `type` field — see listPosts. */
+  status?: "draft" | "scheduled" | "published";
+  fromDate?: string;
+  toDate?: string;
+  limit?: number;
+}
+
+export interface ListPostsResult {
+  posts: SocialPost[];
+  /** GHL's own match count, which is not the same as posts.length. */
+  total: number;
+}
+
+/**
+ * The Social Planner queue.
+ *
+ * Three things about this endpoint were established by probing it rather than
+ * from documentation, and all three are load-bearing:
+ *
+ * - `skip` and `limit` must be number STRINGS. Numbers return 422.
+ * - There is no `status` body field; 422 says "property status should not
+ *   exist". Status filtering happens through `type` instead.
+ * - `type: "recent"` excludes drafts, so omitting `type` — not passing "recent"
+ *   or "all" — is what actually means "everything".
+ *
+ * `accountIds` is rejected too, which is why the platform filter runs here.
+ */
+export async function listPosts(
+  env: GHLApiEnv,
+  filters: ListPostFilters,
+): Promise<ListPostsResult> {
+  const data = await socialFetch<{
+    results?: { posts?: unknown[]; count?: number };
+    posts?: unknown[];
+  }>(env, {
+    method: "POST",
+    path: buildPath("/social-media-posting/{locationId}/posts/list", {
+      locationId: env.GHL_LOCATION_ID,
+    }),
+    body: {
+      skip: "0",
+      limit: String(filters.limit ?? SOCIAL_POST_LIST_LIMIT),
+      ...(filters.status !== undefined ? { type: filters.status } : {}),
+      ...(filters.fromDate !== undefined ? { fromDate: filters.fromDate } : {}),
+      ...(filters.toDate !== undefined ? { toDate: filters.toDate } : {}),
+    },
+  });
+
+  const raw = data?.results?.posts ?? data?.posts ?? [];
+  const posts: SocialPost[] = [];
+  for (const item of raw) {
+    const post = normalisePost(item);
+    if (post !== null) posts.push(post);
+  }
+
+  const total = typeof data?.results?.count === "number" ? data.results.count : posts.length;
+
+  if (filters.platform === undefined) return { posts, total };
+
+  // Posts carry account ids, not platform names, and the endpoint will not
+  // filter by account — so resolve the platform's accounts and match here.
+  // Once filtered, GHL's count no longer describes this result.
+  const accounts = await listSocialAccounts(env);
+  const ids = new Set(accounts.filter((a) => a.platform === filters.platform).map((a) => a.id));
+  const filtered = posts.filter((p) => (p.accountIds ?? []).some((id) => ids.has(id)));
+  return { posts: filtered, total: filtered.length };
+}
+
+export async function getPost(env: GHLApiEnv, postId: string): Promise<SocialPost> {
+  const data = await socialFetch<{ results?: { post?: unknown } }>(env, {
+    method: "GET",
+    path: buildPath(POST_TEMPLATE, { locationId: env.GHL_LOCATION_ID, postId }),
+  });
+
+  const post = normalisePost(data?.results?.post);
+  if (post === null) throw ToolError.notFound("social post", postId);
+  return post;
+}
+
+/**
+ * Content edits only. Rescheduling belongs to schedulePost, so the two never
+ * contend over the same fields and an edit cannot move a post's publish time
+ * as a side effect.
+ */
+export async function updatePost(
+  env: GHLApiEnv,
+  postId: string,
+  patch: { summary?: string; media?: MediaItem[] },
+): Promise<SocialPost> {
+  const data = await socialFetch<{ results?: { post?: unknown } }>(env, {
+    method: "PUT",
+    path: buildPath(POST_TEMPLATE, { locationId: env.GHL_LOCATION_ID, postId }),
+    body: {
+      ...(patch.summary !== undefined ? { summary: patch.summary } : {}),
+      ...(patch.media !== undefined ? { media: patch.media } : {}),
+    },
+  });
+
+  const post = normalisePost(data?.results?.post);
+  if (post === null) throw ToolError.notFound("social post", postId);
+  return post;
+}
+
+export async function schedulePost(
+  env: GHLApiEnv,
+  postId: string,
+  scheduleDate: string,
+): Promise<SocialPost> {
+  const data = await socialFetch<{ results?: { post?: unknown } }>(env, {
+    method: "PUT",
+    path: buildPath(POST_TEMPLATE, { locationId: env.GHL_LOCATION_ID, postId }),
+    body: { status: "scheduled", scheduleDate },
+  });
+
+  const post = normalisePost(data?.results?.post);
+  if (post === null) throw ToolError.notFound("social post", postId);
+  return post;
+}
+
+export async function deletePost(
+  env: GHLApiEnv,
+  postId: string,
+): Promise<{ deleted: true; postId: string }> {
+  await socialFetch(env, {
+    method: "DELETE",
+    path: buildPath(POST_TEMPLATE, { locationId: env.GHL_LOCATION_ID, postId }),
+  });
+  return { deleted: true, postId };
 }

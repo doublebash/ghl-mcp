@@ -3,10 +3,15 @@ import { ToolError } from "@bashco/mcp-toolkit";
 import {
   assertAccountsBelongTo,
   createPost,
+  deletePost,
+  getPost,
+  listPosts,
   listSocialAccounts,
+  schedulePost,
   socialFetch,
+  updatePost,
 } from "../../src/ghl/social.js";
-import { errorResponse, stubGhl, TEST_ENV } from "../helpers/stubGhl.js";
+import { daysFromNow, errorResponse, stubGhl, TEST_ENV } from "../helpers/stubGhl.js";
 
 let stub: ReturnType<typeof stubGhl>;
 afterEach(() => stub?.restore());
@@ -251,5 +256,135 @@ describe("createPost", () => {
     const body = stub.only().body as Record<string, unknown>;
     expect("media" in body).toBe(false);
     expect("followUpComment" in body).toBe(false);
+  });
+});
+
+const LIST_PATH = "/social-media-posting/loc123/posts/list";
+const ONE_POST_PATH = "/social-media-posting/loc123/posts/6a8ab4a4420254dd183aab3a";
+const POST_ID = "6a8ab4a4420254dd183aab3a";
+
+describe("listPosts", () => {
+  it("normalises _id to id and reports GHL's own count as the total", async () => {
+    stub = stubGhl({
+      [`POST ${LIST_PATH}`]: {
+        results: { posts: [{ _id: "p1" }, { _id: "p2" }], count: 380 },
+      },
+    });
+
+    const { posts, total } = await listPosts(realEnv, {});
+
+    expect(posts.map((p) => p.id)).toEqual(["p1", "p2"]);
+    // Not posts.length: a page of 2 out of 380 must not read as the whole queue.
+    expect(total).toBe(380);
+  });
+
+  // GHL 422s on a `status` body field ("property status should not exist") and
+  // requires skip/limit as number strings. Both confirmed in the Phase 0 spike.
+  it("maps status onto type and sends skip/limit as number strings", async () => {
+    stub = stubGhl({ [`POST ${LIST_PATH}`]: { results: { posts: [], count: 0 } } });
+    await listPosts(realEnv, { status: "draft", limit: 5 });
+
+    const body = stub.only().body as Record<string, unknown>;
+    expect(body.type).toBe("draft");
+    expect(body.skip).toBe("0");
+    expect(body.limit).toBe("5");
+    expect("status" in body).toBe(false);
+    expect("accountIds" in body).toBe(false);
+  });
+
+  // type: "recent" excludes drafts, so omitting type is what "everything" means.
+  it("omits type entirely when no status filter is given", async () => {
+    stub = stubGhl({ [`POST ${LIST_PATH}`]: { results: { posts: [], count: 0 } } });
+    await listPosts(realEnv, {});
+
+    expect("type" in (stub.only().body as Record<string, unknown>)).toBe(false);
+  });
+
+  it("passes a date window through", async () => {
+    stub = stubGhl({ [`POST ${LIST_PATH}`]: { results: { posts: [], count: 0 } } });
+    const from = daysFromNow(-7);
+    const to = daysFromNow(7);
+    await listPosts(realEnv, { fromDate: from, toDate: to });
+
+    const body = stub.only().body as Record<string, unknown>;
+    expect(body.fromDate).toBe(from);
+    expect(body.toDate).toBe(to);
+  });
+
+  // The endpoint rejects accountIds outright, so platform filtering is ours to do.
+  it("filters by platform client-side using the configured account ids", async () => {
+    stub = stubGhl({
+      [`POST ${LIST_PATH}`]: {
+        results: {
+          posts: [
+            { _id: "p1", accountIds: [YT_ID] },
+            { _id: "p2", accountIds: [FB_ID] },
+          ],
+          count: 2,
+        },
+      },
+    });
+
+    const { posts, total } = await listPosts(realEnv, { platform: "youtube" });
+
+    expect(posts.map((p) => p.id)).toEqual(["p1"]);
+    // Filtering client-side makes GHL's count wrong for this result.
+    expect(total).toBe(1);
+  });
+});
+
+describe("getPost", () => {
+  it("returns the post", async () => {
+    stub = stubGhl({ [`GET ${ONE_POST_PATH}`]: { results: { post: { _id: POST_ID, summary: "hi" } } } });
+    expect(await getPost(realEnv, POST_ID)).toMatchObject({ id: POST_ID, summary: "hi" });
+  });
+
+  it("reports not found when GHL returns no post", async () => {
+    stub = stubGhl({ [`GET ${ONE_POST_PATH}`]: { results: {} } });
+    await expect(getPost(realEnv, POST_ID)).rejects.toBeInstanceOf(ToolError);
+  });
+
+  it("rejects a post id that fails the GHL id pattern before calling out", async () => {
+    stub = stubGhl({});
+    await expect(getPost(realEnv, "../accounts")).rejects.toBeInstanceOf(ToolError);
+    expect(stub.calls).toHaveLength(0);
+  });
+});
+
+describe("updatePost", () => {
+  it("sends only the fields provided, and never touches the schedule", async () => {
+    stub = stubGhl({ [`PUT ${ONE_POST_PATH}`]: { results: { post: { _id: POST_ID, summary: "new" } } } });
+    await updatePost(realEnv, POST_ID, { summary: "new" });
+
+    const call = stub.only();
+    expect(call.method).toBe("PUT");
+    const body = call.body as Record<string, unknown>;
+    expect(body.summary).toBe("new");
+    expect("media" in body).toBe(false);
+    expect("scheduleDate" in body).toBe(false);
+    expect("status" in body).toBe(false);
+  });
+});
+
+describe("schedulePost", () => {
+  it("sets status and scheduleDate together", async () => {
+    stub = stubGhl({
+      [`PUT ${ONE_POST_PATH}`]: { results: { post: { _id: POST_ID, status: "scheduled" } } },
+    });
+    const when = daysFromNow(2);
+    await schedulePost(realEnv, POST_ID, when);
+
+    const body = stub.only().body as Record<string, unknown>;
+    expect(body.status).toBe("scheduled");
+    expect(body.scheduleDate).toBe(when);
+  });
+});
+
+describe("deletePost", () => {
+  it("deletes and reports the id back", async () => {
+    stub = stubGhl({ [`DELETE ${ONE_POST_PATH}`]: { success: true } });
+
+    expect(await deletePost(realEnv, POST_ID)).toEqual({ deleted: true, postId: POST_ID });
+    expect(stub.only().method).toBe("DELETE");
   });
 });
