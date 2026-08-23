@@ -78,6 +78,7 @@ wrangler secret put GHL_CALENDAR_ID        # default calendar for appointment to
 | `GHL_API_TOKEN`       | GoHighLevel API token (location-scoped, least-privilege). |
 | `GHL_LOCATION_ID`     | GoHighLevel location ID. |
 | `GHL_USER_ID`         | Default "assigned to" user. |
+| `GHL_SOCIAL_ACCOUNTS` | JSON array of the social accounts connected in your Social Planner, e.g. `[{"id":"abc","platform":"facebook","name":"My Page"}]`. Only needed for the social posting tools — see below. |
 | `GHL_CALENDAR_ID`     | Default calendar for `add_appointment`. |
 
 ### 4. Deploy

@@ -20,6 +20,10 @@ head_sampling_rate = 1
 #   GHL_CALENDAR_ID            — Default GHL calendar ID
 #   MCP_APPROVAL_CODE          — One-time code the operator pastes in /authorize. NEVER returned to clients.
 #   GHL_OAUTH_CLIENT_SECRET    — (Optional) Only if you enable a confidential client. Disabled by default.
+#   GHL_SOCIAL_ACCOUNTS        — JSON array of connected social accounts: [{"id","platform","name"}].
+#                                Needed because GHL guards its accounts endpoint with
+#                                socialplanner/account.readonly, a scope private integrations
+#                                are not offered. Read the ids from the Social Planner UI.
 
 # Forkers: replace this id with your own. Create one via:
 #   wrangler kv:namespace create GHL_OAUTH_KV

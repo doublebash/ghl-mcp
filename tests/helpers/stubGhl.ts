@@ -6,6 +6,7 @@ export const TEST_ENV: GHLApiEnv = {
   GHL_LOCATION_ID: "loc123",
   GHL_USER_ID: "user456",
   GHL_CALENDAR_ID: "cal789",
+  GHL_SOCIAL_ACCOUNTS: "[]",
 };
 
 export interface RecordedCall {

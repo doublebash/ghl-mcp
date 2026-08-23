@@ -5,6 +5,15 @@ export interface GHLApiEnv {
   GHL_LOCATION_ID: string;
   GHL_USER_ID: string;
   GHL_CALENDAR_ID: string;
+  /**
+   * Connected social accounts as a JSON array of { id, platform, name }.
+   *
+   * GHL guards GET /social-media-posting/{locationId}/accounts with
+   * socialplanner/account.readonly, a scope this location's private integration
+   * cannot grant — it 401s regardless of API version. The posting tools only
+   * ever needed the ids, not the listing endpoint, so they come from config.
+   */
+  GHL_SOCIAL_ACCOUNTS: string;
 }
 
 export interface WorkerEnv extends GHLApiEnv {
@@ -25,5 +34,6 @@ export function ghlEnvFrom(env: WorkerEnv): GHLApiEnv {
     GHL_LOCATION_ID: env.GHL_LOCATION_ID,
     GHL_USER_ID: env.GHL_USER_ID,
     GHL_CALENDAR_ID: env.GHL_CALENDAR_ID,
+    GHL_SOCIAL_ACCOUNTS: env.GHL_SOCIAL_ACCOUNTS,
   };
 }
