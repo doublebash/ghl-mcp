@@ -42,7 +42,19 @@ regardless — but it would let `list_social_accounts` go live.
 **Version header:** `2021-07-28` is correct. The 401 was identical across versions, and the 422
 came back under `2021-07-28`, so that version reaches the endpoint's own validation.
 
-**`POST /social-media-posting/{locationId}/posts/list` contract**, from the 422 body:
+**CONFIRMED WORKING** on the second run: `{"type":"recent","skip":"0","limit":"20"}` returns
+**HTTP 201** (not 200) with:
+
+```json
+{"success":true,"statusCode":201,"message":"Fetched Posts","results":{"posts":[],"count":0}}
+```
+
+So: posts live at `results.posts`, and `results.count` carries the total independent of how many
+were returned. `count` is what `list_social_posts` should report as `total` — deriving total from
+`items.length` would claim a 50-item page was the whole queue, which is the exact failure v2.5.0's
+`truncateList` exists to prevent.
+
+**`POST /social-media-posting/{locationId}/posts/list` contract**, from the earlier 422 body:
 
 ```
 "property accountIds should not exist"
@@ -64,9 +76,15 @@ Three concrete corrections to the planned implementation:
 **Not yet answered.** Both need `--create-draft`, which needs a real account ID — and the accounts
 endpoint is exactly what 401s.
 
-Path to unblock: run `posts/list` with the corrected parameters. Existing posts carry their
-`accountIds`, so the queue itself yields the IDs needed both for the draft test and for the
-`GHL_SOCIAL_ACCOUNTS` secret:
+**The queue is empty** (`posts: [], count: 0`), so there are no existing posts to harvest account
+IDs from. Two ways to get them:
+
+1. **Create one draft in the GHL Social Planner UI** targeting all five accounts, then re-run the
+   list — the returned post carries every `accountId` at once. Easiest, and it needs no devtools.
+2. **Read them from the Network tab** with the Social Planner open: the UI calls the same accounts
+   endpoint internally using a session token, which is not scope-limited the way the PIT is.
+
+Path that was tried and did not work — kept so it is not retried:
 
 ```bash
 curl -sS -X POST "https://services.leadconnectorhq.com/social-media-posting/$GHL_LOCATION_ID/posts/list" \
@@ -88,4 +106,10 @@ internal accounts call.
 | 2 — accounts endpoint | **401, scope unavailable** | **Task 3b replaces Task 3** |
 | 3 — external media URLs | Unanswered | Blocks Task 8 schemas being final |
 | 4 — publish-now semantics | Unanswered | Blocks Task 4 status mapping being final |
-| 5 — version + list contract | `2021-07-28`; `skip`/`limit` are strings; no `accountIds` | Task 5 `listPosts` corrected |
+| 5 — version + list contract | `2021-07-28`; `skip`/`limit` are strings; no `accountIds`; returns **201**, posts at `results.posts`, total at `results.count` | Task 5 `listPosts` corrected to return `{ posts, total }` |
+
+## Run 2 (2026-08-21, after correcting the list parameters)
+
+- `posts/list` → **201**, `results.posts: []`, `results.count: 0`. Contract confirmed.
+- Accounts endpoint → 401, unchanged. Not a version or parameter problem.
+- Social Planner queue is empty, so account IDs must come from the UI (see Unknowns 3 and 4).

@@ -39,7 +39,9 @@ call() {
   fi
   echo "HTTP $status"
   python3 -m json.tool < "$tmp" 2>/dev/null | head -60 || head -c 2000 "$tmp"
-  if [ -n "$save" ] && [ "$status" = "200" ]; then
+  # GHL answers POST /posts/list with 201, not 200 — saving only on 200 silently
+  # skipped the fixture and the account-id harvest that reads it.
+  if [ -n "$save" ] && [ "${status:0:1}" = "2" ]; then
     cp "$tmp" "$OUT/$save"; echo "--> saved $OUT/$save"
   fi
   rm -f "$tmp"; echo

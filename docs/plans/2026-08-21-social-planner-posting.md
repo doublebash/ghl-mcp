@@ -821,7 +821,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Produces:
-  - `listPosts(env, filters: { platform?: SocialPlatform; status?: string; fromDate?: string; toDate?: string; limit?: number }): Promise<SocialPost[]>`
+  - `listPosts(env, filters: { platform?: SocialPlatform; status?: string; fromDate?: string; toDate?: string; limit?: number }): Promise<{ posts: SocialPost[]; total: number }>` — `total` is GHL's own `results.count`, not `posts.length`
   - `getPost(env, postId): Promise<SocialPost>`
   - `updatePost(env, postId, patch: { summary?: string; media?: MediaItem[] }): Promise<SocialPost>`
   - `schedulePost(env, postId, scheduleDate): Promise<SocialPost>`
@@ -837,12 +837,24 @@ const POST_PATH = "/social-media-posting/loc123/posts/p1";
 
 describe("post lifecycle", () => {
   it("lists posts, normalising _id to id", async () => {
-    stub = stubGhl({ [`POST ${LIST_PATH}`]: { posts: [{ _id: "p1" }, { _id: "p2" }] } });
-    expect((await listPosts(TEST_ENV, { limit: 10 })).map((p) => p.id)).toEqual(["p1", "p2"]);
+    stub = stubGhl({
+      [`POST ${LIST_PATH}`]: { results: { posts: [{ _id: "p1" }, { _id: "p2" }], count: 2 } },
+    });
+    const { posts } = await listPosts(TEST_ENV, { limit: 10 });
+    expect(posts.map((p) => p.id)).toEqual(["p1", "p2"]);
+  });
+
+  it("reports GHL's own count as the total, not the page length", async () => {
+    stub = stubGhl({
+      [`POST ${LIST_PATH}`]: { results: { posts: [{ _id: "p1" }], count: 380 } },
+    });
+    const { posts, total } = await listPosts(TEST_ENV, { limit: 1 });
+    expect(posts).toHaveLength(1);
+    expect(total).toBe(380);
   });
 
   it("sends the list filters in the body", async () => {
-    stub = stubGhl({ [`POST ${LIST_PATH}`]: { posts: [] } });
+    stub = stubGhl({ [`POST ${LIST_PATH}`]: { results: { posts: [], count: 0 } } });
     await listPosts(TEST_ENV, { fromDate: daysFromNow(-7), toDate: daysFromNow(7), limit: 5 });
 
     const body = stub.only().body as Record<string, unknown>;
@@ -855,10 +867,13 @@ describe("post lifecycle", () => {
 
   it("filters by platform using that platform's account ids", async () => {
     stub = stubGhl({
-      [`POST ${LIST_PATH}`]: { posts: [{ _id: "p1", accountIds: ["ig-1"] }, { _id: "p2", accountIds: ["fb-1"] }] },
+      [`POST ${LIST_PATH}`]: {
+        results: { posts: [{ _id: "p1", accountIds: ["ig-1"] }, { _id: "p2", accountIds: ["fb-1"] }], count: 2 },
+      },
       [`GET ${ACCOUNTS_PATH}`]: accountsBody,
     });
-    expect((await listPosts(TEST_ENV, { platform: "instagram" })).map((p) => p.id)).toEqual(["p1"]);
+    const { posts } = await listPosts(TEST_ENV, { platform: "instagram" });
+    expect(posts.map((p) => p.id)).toEqual(["p1"]);
   });
 
   it("gets a single post", async () => {
@@ -926,7 +941,10 @@ export interface ListPostFilters {
 const POST_TEMPLATE = "/social-media-posting/{locationId}/posts/{postId}";
 
 export async function listPosts(env: GHLApiEnv, filters: ListPostFilters): Promise<SocialPost[]> {
-  const data = await socialFetch<{ posts?: unknown[]; results?: { posts?: unknown[] } }>(env, {
+  const data = await socialFetch<{
+    posts?: unknown[];
+    results?: { posts?: unknown[]; count?: number };
+  }>(env, {
     method: "POST",
     path: buildPath("/social-media-posting/{locationId}/posts/list", {
       locationId: env.GHL_LOCATION_ID,
@@ -944,20 +962,26 @@ export async function listPosts(env: GHLApiEnv, filters: ListPostFilters): Promi
     },
   });
 
-  const raw = data?.posts ?? data?.results?.posts ?? [];
+  const raw = data?.results?.posts ?? data?.posts ?? [];
   const posts: SocialPost[] = [];
   for (const item of raw) {
     const post = normalisePost(item);
     if (post !== null) posts.push(post);
   }
 
-  if (filters.platform === undefined) return posts;
+  // GHL reports the true match count separately. Reporting posts.length as the
+  // total would describe one page as the entire queue.
+  const total = typeof data?.results?.count === "number" ? data.results.count : posts.length;
+
+  if (filters.platform === undefined) return { posts, total };
 
   // Posts carry account ids, not platform names, so resolve the platform's
-  // accounts and keep posts targeting at least one of them.
+  // accounts and keep posts targeting at least one of them. Filtering is
+  // client-side because the endpoint rejects accountIds outright.
   const accounts = await listSocialAccounts(env);
   const ids = new Set(accounts.filter((a) => a.platform === filters.platform).map((a) => a.id));
-  return posts.filter((p) => (p.accountIds ?? []).some((id) => ids.has(id)));
+  const filtered = posts.filter((p) => (p.accountIds ?? []).some((id) => ids.has(id)));
+  return { posts: filtered, total: filtered.length };
 }
 
 export async function getPost(env: GHLApiEnv, postId: string): Promise<SocialPost> {
@@ -1801,12 +1825,28 @@ import {
 ```typescript
   schedule_social_post: (env, { postId, scheduleDate }) => schedulePost(env, postId, scheduleDate),
 
-  list_social_posts: async (env, args) =>
-    truncateList(
-      await listPosts(env, compact(args)),
+  list_social_posts: async (env, args) => {
+    const { posts, total } = await listPosts(env, compact(args));
+    const result = truncateList(
+      posts,
       "social posts",
       "Narrow with a platform, a status, or a fromDate/toDate window.",
-    ),
+    );
+    // truncateList derives total from the array it was handed; GHL knows the
+    // real figure, so a page of 50 out of 380 must not report total 50.
+    if (total > result.total) {
+      return {
+        ...result,
+        total,
+        truncated: true,
+        note:
+          `Showing ${result.returned} of ${total} social posts. This is a partial list — ` +
+          `do not describe it as the whole queue. ` +
+          `Narrow with a platform, a status, or a fromDate/toDate window.`,
+      };
+    }
+    return result;
+  },
 
   get_social_post: (env, { postId }) => getPost(env, postId),
 
