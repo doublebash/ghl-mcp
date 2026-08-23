@@ -98,10 +98,14 @@ print(json.dumps([{"id": i, "platform": pl} for i, pl in sorted(rows)], indent=2
       else "No accountIds found in any list response.\nIf you have NOT created a draft in the Social Planner UI yet, do that first.\nIf you HAVE, check the type enum probe above for the value that exposes drafts.")' "$OUT" || true
 
 if [ "$CREATE_DRAFT" = "1" ]; then
-  : "${ACCOUNT_ID:?set ACCOUNT_ID to a facebook or linkedin id from the accounts response}"
+  : "${ACCOUNT_ID:?set ACCOUNT_ID to an account id from the list-posts harvest above}"
+  # Create rejects a post without one: "userId must be a string / should not be
+  # empty". Any GHL user id in the location works; the harvested posts carry one
+  # in createdBy if GHL_USER_ID is not to hand.
+  : "${GHL_USER_ID:?set GHL_USER_ID (a GHL user id — see createdBy on any harvested post)}"
   echo "### Unknowns 3, 4 — external media URL + draft creation (WRITES to the live account)"
   call "create draft" POST "/social-media-posting/$GHL_LOCATION_ID/posts" "2021-07-28" \
-    "{\"accountIds\":[\"$ACCOUNT_ID\"],\"type\":\"post\",\"status\":\"draft\",\"summary\":\"phase 0 spike — safe to delete\",\"media\":[{\"url\":\"https://picsum.photos/1080\"}]}" \
+    "{\"accountIds\":[\"$ACCOUNT_ID\"],\"userId\":\"$GHL_USER_ID\",\"type\":\"post\",\"status\":\"draft\",\"summary\":\"phase 0 spike — safe to delete\",\"media\":[{\"url\":\"https://picsum.photos/1080\"}]}" \
     "create-post.json"
   echo "Delete it with:"
   echo "  curl -X DELETE \"$BASE/social-media-posting/$GHL_LOCATION_ID/posts/<postId>\" -H \"Authorization: Bearer \$GHL_API_TOKEN\" -H \"Version: 2021-07-28\""

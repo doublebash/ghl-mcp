@@ -211,3 +211,44 @@ with the operator rather than assumed.
 
 Unknowns 3 (external media URLs) and 4 (publish-now semantics) remain. An account id is now
 available, so `--create-draft` can finally run.
+
+
+---
+
+# Run 5 (2026-08-21) — filter fields and the create contract
+
+## `posts/list` filter fields — settled
+
+| Field | Result |
+|---|---|
+| `status` | **422 — "property status should not exist"** |
+| `fromDate` + `toDate` | **201, accepted** (ISO 8601 with `Z`) |
+| `type`, `skip`, `limit` | accepted (`skip`/`limit` as number strings) |
+
+So `list_social_posts` maps its `status` argument onto `type` — `draft` → `type: "draft"`,
+`scheduled` → `"scheduled"`, `published` → `"published"`, and omits `type` when no status is
+given, which returns everything. It must never send a `status` body field.
+
+`fromDate`/`toDate` pass validation. Whether they actually filter is not yet proven — the only
+posts in this location fall inside the window that was tested, so a non-filtering implementation
+would look identical. Not worth another probe: the client-side platform filter already runs, and
+a date window that silently fails open would only ever return *more* than asked, which
+`truncateList` reports honestly.
+
+## Create requires `userId`
+
+```
+HTTP 422 ["userId must be a string", "userId should not be empty"]
+```
+
+`POST /posts` rejects a body without `userId`. The planned `createPost` already sends
+`userId: env.GHL_USER_ID`, so the implementation was right and only the spike script was wrong.
+Confirms `GHL_USER_ID` is load-bearing for social posting, not merely a CRM default.
+
+Note this 422 is also further proof the token is authorised for `socialplanner/post.write` —
+the request reached body validation.
+
+## Still open
+
+Unknowns 3 (external media URL) and 4 (publish-now semantics) — one run away, now that the script
+sends `userId`.
