@@ -2,13 +2,13 @@
 
 A hardened **Model Context Protocol** server bridging Claude to **GoHighLevel CRM**, deployed on **Cloudflare Workers**.
 
-Fork this repo, deploy to your own Cloudflare account, point Claude.ai at your worker, and Claude can read and write your GoHighLevel data through 26 typed tools (contacts, opportunities, conversations, appointments, workflows, tags, tasks, notes).
+Fork this repo, deploy to your own Cloudflare account, point Claude.ai at your worker, and Claude can read and write your GoHighLevel data through 37 typed tools — CRM (contacts, opportunities, conversations, appointments, workflows, tags, tasks, notes) plus social posting to Facebook, Instagram, YouTube, LinkedIn and TikTok via the Social Planner.
 
 Built on [`@bashco/mcp-toolkit`](https://github.com/doublebash/mcp-toolkit) — OAuth, per-client bearer tokens, rate limiting, structured logging, and typed tool dispatch are all handled by the shared library.
 
 ## What you get
 
-- **26 GHL tools** — contacts, opportunities, pipelines, conversations, appointments, workflows, tags, tasks, notes. Full live catalogue at the `tools/list` MCP endpoint after deploy.
+- **37 GHL tools** — 26 CRM (contacts, opportunities, pipelines, conversations, appointments, workflows, tags, tasks, notes) and 11 social posting. Full live catalogue at the `tools/list` MCP endpoint after deploy.
 - **OAuth 2.0 + PKCE** authentication for Claude.ai
 - **Per-client bearer tokens** — each Claude connection gets a unique token; compromise of one affects only that client
 - **Cloudflare rate limiting** on `/approve`, `/token`, `/register`, `/mcp`
@@ -95,9 +95,69 @@ Wrangler prints your worker URL — something like `https://ghl-mcp.<your-accoun
 2. Server URL: `https://ghl-mcp.<your-account>.workers.dev/mcp`
 3. Claude.ai redirects you to your worker's `/authorize` page
 4. Paste your `MCP_APPROVAL_CODE` and confirm
-5. You're connected — Claude now has the 26 GHL tools available
+5. You're connected — Claude now has the 37 GHL tools available
 
 The approval-code step happens **once per Claude.ai client**. Subsequent requests use the per-client bearer issued during this flow.
+
+## Social posting
+
+Eleven of the 37 tools post to the accounts connected in your GoHighLevel **Social Planner**.
+
+- `list_social_accounts` — run first; the posting tools need explicit account IDs
+- `post_to_facebook`, `post_to_instagram`, `post_to_youtube`, `post_to_linkedin`, `post_to_tiktok`
+- `schedule_social_post`, `list_social_posts`, `get_social_post`, `update_social_post`, `delete_social_post`
+
+### How the posting model works, and why
+
+- **`status` is required, with no default.** Every posting tool takes `draft` or `published`
+  explicitly, so an under-specified call cannot publish something by accident.
+- **Scheduling is a separate act.** Create a draft, then call `schedule_social_post`. The posting
+  tools take no date at all, which keeps the future-date rule in one place and gives you a review
+  point before anything is queued.
+- **Account IDs are always explicit.** Posting to an account belonging to another platform is
+  rejected inside the Worker, before any request goes out.
+- **Media is passed as public `https://` URLs.** There is no upload path — GHL accepts externally
+  hosted media directly.
+- **Queued is not published.** A successful create means GoHighLevel accepted the post, not that
+  the platform did. Confirm with `get_social_post`.
+
+### Extra setup for social
+
+**1. Scopes.** Your `GHL_API_TOKEN` needs these Private Integration scopes on top of the CRM ones:
+
+```
+socialplanner/post.readonly
+socialplanner/post.write
+socialplanner/oauth.readonly
+```
+
+**2. `GHL_SOCIAL_ACCOUNTS`.** GoHighLevel guards its connected-accounts endpoint with
+`socialplanner/account.readonly`, a scope private integrations are not offered — the endpoint
+returns `401 "The token is not authorized for this scope."` regardless of API version. The posting
+tools only ever needed the account IDs, so they come from a secret instead:
+
+```bash
+wrangler secret put GHL_SOCIAL_ACCOUNTS
+```
+
+Paste a JSON array:
+
+```json
+[
+  {"id":"<accountId>","platform":"facebook","name":"My Page"},
+  {"id":"<accountId>","platform":"instagram","name":"@myhandle"},
+  {"id":"<accountId>","platform":"youtube","name":"My Channel"},
+  {"id":"<accountId>","platform":"linkedin","name":"My Company"},
+  {"id":"<accountId>","platform":"tiktok","name":"@myhandle"}
+]
+```
+
+To find the IDs: open the Social Planner in your browser with devtools on the **Network** tab,
+reload, and read the response of the request ending in `/accounts`. The UI calls that endpoint
+with a session token, which is not scope-limited the way a private integration token is.
+
+Get the `platform` values right — they drive the guard that stops a LinkedIn account ID being
+used for a YouTube post.
 
 ## Local development
 

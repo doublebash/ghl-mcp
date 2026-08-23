@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { toolSchemas } from "../../src/mcp/schemas.js";
 import { dispatchToolCall } from "../../src/mcp/tools.js";
 import { daysFromNow, stubGhl, TEST_ENV } from "../helpers/stubGhl.js";
 
@@ -369,5 +370,19 @@ describe("social lifecycle tools", () => {
     ).rejects.toMatchObject({ status: 400 });
 
     expect(stub.calls).toHaveLength(0);
+  });
+});
+
+describe("catalogue completeness", () => {
+  it("declares 37 tools, every one with a handler", () => {
+    // defineTools builds dispatch from the same map as the catalogue, so a
+    // schema without a handler fails the build rather than surfacing at runtime.
+    expect(Object.keys(toolSchemas)).toHaveLength(37);
+  });
+
+  it("rejects a social tool name that does not exist", async () => {
+    await expect(dispatchToolCall(TEST_ENV, "post_to_myspace", {})).rejects.toMatchObject({
+      userMessage: "unknown tool",
+    });
   });
 });
