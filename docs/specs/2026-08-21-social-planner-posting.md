@@ -177,16 +177,19 @@ behaviour: safe summary out, upstream body confined to structured logs.
 | `socialplanner/oauth.readonly` | connected-integration reads — **presumed** to cover `list_social_accounts` |
 | `socialplanner/oauth.write` | not required by this design; granted but unused |
 
-**Scope gap to verify.** GHL also publishes `socialplanner/account.readonly` / `.write`, and the
-accounts endpoint may be guarded by those. They were **not offered** in this account's
-private-integration scope picker. If the accounts endpoint demands them, `list_social_accounts`
-returns 403 and no token change fixes it. Fallback: configure the account IDs as a
-`GHL_SOCIAL_ACCOUNTS` secret read from the Social Planner UI; `list_social_accounts` then serves
-from config and the posting tools are unaffected, since they need only the IDs. That costs one
-manual step and delays nothing.
+**Scope gap — confirmed, not hypothetical.** The 2026-08-21 spike returned
+`401 "The token is not authorized for this scope."` from `GET /social-media-posting/{locationId}/accounts`
+under both API versions. `socialplanner/oauth.readonly` covers OAuth integration endpoints, not the
+accounts listing; that needs `socialplanner/account.readonly`, which this account's scope picker
+does not offer. Note GHL uses **401**, not 403, for scope failures.
 
-**Token-type risk.** Sub-account Private Integration Tokens are reported to return `Invalid JWT`
-against Social Planner endpoints specifically while working fine for CRM. This is tested first.
+Therefore `list_social_accounts` serves from a `GHL_SOCIAL_ACCOUNTS` secret rather than the API.
+The posting tools are unaffected — they need the account IDs, not the listing endpoint — so this
+costs one manual setup step and changes nothing else in the design.
+
+**Token type — cleared.** The reported `Invalid JWT` risk did not materialise. The PIT
+authenticates: `POST /posts/list` reached body validation and returned a 422 with field-level
+errors, which only happens after auth and scope checks pass.
 
 ## 10. Phase 0 — verify before building
 
