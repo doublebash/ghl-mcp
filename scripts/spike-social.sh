@@ -59,7 +59,7 @@ done
 # GHL validates with NestJS class-validator (the 422 said "must be a number
 # string"), so an invalid enum value makes it enumerate the valid ones. Cheaper
 # than guessing which `type` exposes drafts.
-echo "### Discovering the valid values for `type`"
+echo '### Discovering the valid values for the type field'
 call "type enum probe" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
   '{"type":"__invalid__","skip":"0","limit":"5"}'
 
