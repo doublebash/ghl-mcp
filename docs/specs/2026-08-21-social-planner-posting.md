@@ -43,8 +43,10 @@ lifecycle: author, schedule, review the queue, edit, delete.
 ## 3. Non-goals
 
 - **Direct platform APIs.** GHL owns the platform OAuth, token refresh, and app review.
-- **Media upload.** Posting tools take public `https://` URLs. `medias.write` on Private
-  Integration Tokens has a documented 403 problem; the tool surface should not rest on it.
+- **Media upload.** Posting tools take public `https://` URLs — confirmed accepted by the Phase 0
+  spike, which created a live draft carrying an external image URL. `medias.write` on Private
+  Integration Tokens also has a documented 403 problem, so the tool surface should not rest on it
+  regardless.
 - **Category queues / best-time scheduling.** `scheduleDate` is always an explicit timestamp.
 - **Cross-post fan-out.** No "post everywhere" tool. Posting to all five is five calls.
 - **Analytics.** Post insights (likes, shares, comments) are out of scope for this pass.

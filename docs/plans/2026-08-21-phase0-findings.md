@@ -252,3 +252,66 @@ the request reached body validation.
 
 Unknowns 3 (external media URL) and 4 (publish-now semantics) — one run away, now that the script
 sends `userId`.
+
+
+---
+
+# Run 6 (2026-08-21) — draft created, unknown 3 closed
+
+## UNKNOWN 3 — ANSWERED: external media URLs are accepted
+
+`POST /posts` with `media: [{ "url": "https://picsum.photos/1080" }]` returned **201** and the
+created post echoes that URL back unchanged. GHL does **not** require media to be hosted in its own
+library.
+
+**Consequence:** the spec's media non-goal stands on evidence rather than assumption. No
+`medias.write` scope, no upload path, no change to the five posting schemas. Callers pass public
+`https://` URLs.
+
+## Create contract — confirmed working
+
+Request that succeeded:
+
+```json
+{"accountIds":["…_110529568590140_page"],"userId":"dgBW5AeFDwdZSUhRMSD9",
+ "type":"post","status":"draft","summary":"…","media":[{"url":"https://picsum.photos/1080"}]}
+```
+
+- `status: "draft"` is accepted on create and the post comes back `status: "draft"` — it stages in
+  the Social Planner and does not publish.
+- The created post id is `6a8ab7c5f52259e0b0caa3c4` — a 24-character Mongo ObjectId, which fits
+  `GHL_ID_PATTERN`. Post ids stay on `ghlId`; only account ids need the wider type.
+- Response nests the post at `results.post`, matching what `createPost` already parses.
+
+## UNKNOWN 4 — publish semantics, deliberately still open
+
+`status: "published"` is untested and will stay that way for now: the only way to test it is to
+publish something real to a live Facebook page. Not worth burning a genuine post on.
+
+A safer proxy exists — schedule a post a few minutes out, confirm GHL accepts
+`status: "scheduled"` plus `scheduleDate`, then delete it before it fires. That exercises the
+scheduling path, which is the one `schedule_social_post` actually uses, without publishing
+anything. `status: "published"` follows GHL's documented behaviour and gets its first real
+exercise when the operator chooses to make a real post.
+
+## FINDING 3 revisited — `platform` is junk, and my inference is weaker than it looked
+
+The draft was created against the account id I had inferred as **Facebook**
+(`…_110529568590140_page`). GHL labelled the resulting post `platform: "google"`.
+
+Two readings:
+
+1. The `platform` field is a default that does not reflect the target account — supported by
+   every other post carrying `"google"` too, including ones targeting a `17841…` Instagram id and
+   a `UC…` YouTube id. Instagram is Meta, not Google, so the field cannot be per-account truth.
+2. That account genuinely is a Google Business Profile. Numeric ids with a `_page` suffix are
+   plausible for GMB as well as for Facebook Pages.
+
+Reading 1 is more likely, but reading 2 is not excluded, and the two differ on which platform that
+account belongs to. **The mapping must be confirmed from the accounts endpoint via the Social
+Planner UI's own network call** — the operator opening devtools once and reading id → platform
+directly. Guessing here risks `assertAccountsBelongTo` either blocking valid posts or approving
+one aimed at the wrong network.
+
+Until confirmed, `GHL_SOCIAL_ACCOUNTS` stays unset and `list_social_accounts` reports a
+configuration error rather than a wrong answer.
