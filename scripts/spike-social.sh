@@ -50,9 +50,21 @@ for V in 2021-07-28 2021-04-15; do
   call "accounts" GET "/social-media-posting/$GHL_LOCATION_ID/accounts" "$V" "" "accounts.json"
 done
 
-echo "### Unknown 5 — list posts shape"
+# Contract confirmed by the 2026-08-21 422: skip/limit are NUMBER STRINGS and
+# accountIds is rejected outright. Existing posts carry their accountIds, which
+# is how account ids are obtained while the accounts endpoint is scope-blocked.
+echo "### Unknown 5 — list posts shape (also: harvest account ids)"
 call "list posts" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
-  '{"type":"recent","accountIds":[],"skip":0,"limit":5}' "list-posts.json"
+  '{"type":"recent","skip":"0","limit":"20"}' "list-posts.json"
+
+if [ -f "$OUT/list-posts.json" ]; then
+  echo "### Account ids seen in existing posts"
+  python3 -c 'import json,sys
+data = json.load(open(sys.argv[1]))
+posts = data.get("posts") or (data.get("results") or {}).get("posts") or []
+rows = sorted({(a, p.get("platform","?")) for p in posts for a in (p.get("accountIds") or [])})
+print(json.dumps([{"id": i, "platform": pl} for i, pl in rows], indent=2) if rows else "no accountIds in the returned posts")' "$OUT/list-posts.json" || true
+fi
 
 if [ "$CREATE_DRAFT" = "1" ]; then
   : "${ACCOUNT_ID:?set ACCOUNT_ID to a facebook or linkedin id from the accounts response}"
