@@ -54,3 +54,24 @@ export const MAX_CONTACT_SEARCH_LIMIT = 100;
 // trimmed and the response says so explicitly, so the model is never left to
 // assume a truncated list was the whole list.
 export const MAX_RESULT_ITEMS = 100;
+
+export const SOCIAL_PLATFORMS = ["facebook", "instagram", "youtube", "linkedin", "tiktok"] as const;
+export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
+
+// Statuses a posting tool may set. "scheduled" is deliberately absent: scheduling
+// goes through schedule_social_post, so the future-date rule lives in one schema
+// rather than five, and creating a post is always a reviewable act first.
+export const AUTHORABLE_POST_STATUSES = ["draft", "published"] as const;
+export type AuthorableStatus = (typeof AUTHORABLE_POST_STATUSES)[number];
+
+export const SOCIAL_POST_STATUSES = ["draft", "scheduled", "published"] as const;
+
+// Confirmed against the live API in the Phase 0 spike: posts/list answered 201
+// under this version. See docs/plans/2026-08-21-phase0-findings.md.
+export const SOCIAL_API_VERSION = "2021-07-28";
+
+export const MAX_MEDIA_ITEMS = 10;
+export const MAX_SUMMARY_LENGTH = 5000;
+export const MAX_MEDIA_URL_LENGTH = 2048;
+export const MAX_YOUTUBE_TITLE_LENGTH = 100;
+export const SOCIAL_POST_LIST_LIMIT = 50;

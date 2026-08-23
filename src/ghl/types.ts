@@ -96,3 +96,26 @@ export interface Task {
   assignedTo?: string;
   [key: string]: unknown;
 }
+
+export interface SocialAccount {
+  id: string;
+  platform: string;
+  /** False for platforms connected in GHL that this server has no posting tool for. */
+  supported: boolean;
+  name?: string;
+}
+
+export interface MediaItem {
+  url: string;
+  caption?: string;
+  altText?: string;
+}
+
+export interface SocialPost {
+  id: string;
+  status?: string;
+  summary?: string;
+  scheduleDate?: string;
+  accountIds?: string[];
+  [key: string]: unknown;
+}
