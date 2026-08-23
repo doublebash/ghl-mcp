@@ -222,4 +222,40 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     "Run list_social_accounts first to get the TikTok account ID. " +
     "status is REQUIRED: 'draft' stages it, 'published' posts immediately. " +
     "To schedule for later, create a draft then call schedule_social_post.",
+
+  schedule_social_post:
+    "Schedule an existing social post for a future date and time, or move an already-scheduled " +
+    "post to a different time. Takes a post ID from a post_to_* tool or list_social_posts. " +
+    "scheduleDate must be an ISO 8601 timestamp with a timezone offset AND must be in the future. " +
+    "This is the only way to schedule — the post_to_* tools deliberately take no date, so the " +
+    "normal flow is: create the post as a draft, review it, then schedule it.",
+
+  list_social_posts:
+    "List social posts in the GoHighLevel Social Planner — the content queue. " +
+    "Filter by platform, status (draft, scheduled, published) and date range; all filters optional. " +
+    "Omitting status returns posts of every status. " +
+    "Use this to see what is scheduled, find a post ID before editing or deleting, or check " +
+    "whether something published successfully. " +
+    "Returns { items, returned, total, truncated }; if truncated is true you are seeing part of " +
+    "the queue — narrow by platform, status or date range rather than treating it as the whole.",
+
+  get_social_post:
+    "Get the full detail of a single social post by ID, including its current status and whether " +
+    "the platform accepted it. " +
+    "Use this after any post_to_* tool to confirm a post actually went out — a successful create " +
+    "means GoHighLevel queued it, and platform rejections surface afterwards. " +
+    "Run list_social_posts first if you do not have the post ID.",
+
+  update_social_post:
+    "Edit the caption or media of an existing social post that has not gone out yet. " +
+    "This modifies existing data — the values you provide replace what is there. " +
+    "Works on draft and scheduled posts; published posts cannot be edited through the API. " +
+    "To change WHEN a post goes out, use schedule_social_post — this tool does not touch the " +
+    "schedule. Requires a post ID from list_social_posts.",
+
+  delete_social_post:
+    "Delete a social post from the GoHighLevel Social Planner. This cannot be undone. " +
+    "If the post has already been published, deleting it here may not remove it from the social " +
+    "platform itself. " +
+    "Run list_social_posts first to get the post ID and confirm you have the right post.",
 };

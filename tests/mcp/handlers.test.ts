@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { dispatchToolCall } from "../../src/mcp/tools.js";
-import { stubGhl, TEST_ENV } from "../helpers/stubGhl.js";
+import { daysFromNow, stubGhl, TEST_ENV } from "../helpers/stubGhl.js";
 
 let stub: ReturnType<typeof stubGhl>;
 afterEach(() => stub?.restore());
@@ -301,6 +301,71 @@ describe("posting tools", () => {
     stub = stubGhl({});
     await expect(
       dispatchToolCall(env, "post_to_facebook", { accountIds: [FB], summary: "hi" }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    expect(stub.calls).toHaveLength(0);
+  });
+});
+
+describe("social lifecycle tools", () => {
+  const LIST = "POST /social-media-posting/loc123/posts/list";
+  const ONE = "/social-media-posting/loc123/posts/6a8ab4a4420254dd183aab3a";
+  const POST_ID = "6a8ab4a4420254dd183aab3a";
+
+  it("reports GHL's own count when the page is only part of the queue", async () => {
+    stub = stubGhl({ [LIST]: { results: { posts: [{ _id: "p1" }, { _id: "p2" }], count: 380 } } });
+
+    const result = (await dispatchToolCall(TEST_ENV, "list_social_posts", {})) as {
+      returned: number;
+      total: number;
+      truncated: boolean;
+      note?: string;
+    };
+
+    expect(result.returned).toBe(2);
+    expect(result.total).toBe(380);
+    expect(result.truncated).toBe(true);
+    expect(result.note).toContain("partial list");
+  });
+
+  it("does not claim truncation when the page is the whole queue", async () => {
+    stub = stubGhl({ [LIST]: { results: { posts: [{ _id: "p1" }], count: 1 } } });
+
+    const result = (await dispatchToolCall(TEST_ENV, "list_social_posts", {})) as {
+      truncated: boolean;
+    };
+    expect(result.truncated).toBe(false);
+  });
+
+  it("schedules by sending status and scheduleDate together", async () => {
+    stub = stubGhl({ [`PUT ${ONE}`]: { results: { post: { _id: POST_ID, status: "scheduled" } } } });
+    const when = daysFromNow(3);
+
+    await dispatchToolCall(TEST_ENV, "schedule_social_post", { postId: POST_ID, scheduleDate: when });
+
+    const body = stub.only().body as Record<string, unknown>;
+    expect(body.status).toBe("scheduled");
+    expect(body.scheduleDate).toBe(when);
+  });
+
+  it("editing a post cannot move when it goes out", async () => {
+    stub = stubGhl({ [`PUT ${ONE}`]: { results: { post: { _id: POST_ID, summary: "new" } } } });
+
+    await dispatchToolCall(TEST_ENV, "update_social_post", { postId: POST_ID, summary: "new" });
+
+    const body = stub.only().body as Record<string, unknown>;
+    expect(body.summary).toBe("new");
+    expect("scheduleDate" in body).toBe(false);
+    expect("status" in body).toBe(false);
+  });
+
+  it("refuses a past schedule date before any upstream call", async () => {
+    stub = stubGhl({});
+    await expect(
+      dispatchToolCall(TEST_ENV, "schedule_social_post", {
+        postId: POST_ID,
+        scheduleDate: daysFromNow(-1),
+      }),
     ).rejects.toMatchObject({ status: 400 });
 
     expect(stub.calls).toHaveLength(0);

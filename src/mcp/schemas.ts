@@ -7,6 +7,9 @@ import {
   MAX_SUMMARY_LENGTH,
   MAX_YOUTUBE_TITLE_LENGTH,
   SOCIAL_ACCOUNT_ID_PATTERN,
+  SOCIAL_PLATFORMS,
+  SOCIAL_POST_LIST_LIMIT,
+  SOCIAL_POST_STATUSES,
   MAX_APPOINTMENT_LOOKAHEAD_DAYS,
   MAX_CONTACT_SEARCH_LIMIT,
   MAX_CONVERSATION_LIMIT,
@@ -44,6 +47,13 @@ const customFieldList = z
     }),
   )
   .max(50);
+
+// isoDateTime already refines on Date.parse; this adds the future check.
+// Both are refinements, which zod drops from the derived JSON Schema — so
+// schedule_social_post's description states the future rule in prose too.
+const futureIsoDateTime = isoDateTime.refine((v) => Date.parse(v) > Date.now(), {
+  message: "scheduleDate must be in the future",
+});
 
 const socialAccountId = z
   .string()
@@ -313,6 +323,37 @@ export const toolSchemas = {
     allowComments: z.boolean(),
     allowDuet: z.boolean(),
     allowStitch: z.boolean(),
+  }),
+
+  schedule_social_post: z.object({
+    postId: ghlId,
+    scheduleDate: futureIsoDateTime,
+  }),
+
+  list_social_posts: z.object({
+    platform: z.enum(SOCIAL_PLATFORMS).optional(),
+    status: z.enum(SOCIAL_POST_STATUSES).optional(),
+    fromDate: isoDateTime.optional(),
+    toDate: isoDateTime.optional(),
+    limit: z.number().int().min(1).max(SOCIAL_POST_LIST_LIMIT).optional(),
+  }),
+
+  get_social_post: z.object({
+    postId: ghlId,
+  }),
+
+  update_social_post: z
+    .object({
+      postId: ghlId,
+      summary: socialSummary.optional(),
+      media: mediaList.optional(),
+    })
+    .refine((v) => v.summary !== undefined || v.media !== undefined, {
+      message: "provide summary, media, or both — there is nothing to update otherwise",
+    }),
+
+  delete_social_post: z.object({
+    postId: ghlId,
   }),
 } as const;
 

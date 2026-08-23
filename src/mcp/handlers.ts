@@ -26,7 +26,15 @@ import {
   buildTiktokPost,
   buildYoutubePost,
 } from "../ghl/platforms.js";
-import { createPost, listSocialAccounts } from "../ghl/social.js";
+import {
+  createPost,
+  deletePost,
+  getPost,
+  listPosts,
+  listSocialAccounts,
+  schedulePost,
+  updatePost,
+} from "../ghl/social.js";
 import {
   createOpportunity,
   getOpportunities,
@@ -265,4 +273,37 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
         allowStitch: args.allowStitch,
       }),
     ),
+
+  schedule_social_post: (env, { postId, scheduleDate }) => schedulePost(env, postId, scheduleDate),
+
+  list_social_posts: async (env, args) => {
+    const { posts, total } = await listPosts(env, compact(args));
+    const result = truncateList(
+      posts,
+      "social posts",
+      "Narrow by platform, status, or a fromDate/toDate window.",
+    );
+
+    // truncateList derives its total from the array handed to it, but GHL
+    // reports the real match count separately. A page of 50 out of 380 must not
+    // come back claiming 380 was all there was.
+    if (total > result.total) {
+      return {
+        ...result,
+        total,
+        truncated: true,
+        note:
+          `Showing ${result.returned} of ${total} social posts. This is a partial list — ` +
+          "do not describe it as the whole queue. " +
+          "Narrow by platform, status, or a fromDate/toDate window.",
+      };
+    }
+    return result;
+  },
+
+  get_social_post: (env, { postId }) => getPost(env, postId),
+
+  update_social_post: (env, { postId, ...rest }) => updatePost(env, postId, compact(rest)),
+
+  delete_social_post: (env, { postId }) => deletePost(env, postId),
 };

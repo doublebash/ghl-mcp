@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SERVER_VERSION } from "../../src/constants.js";
 import { toolSchemas, type ToolName } from "../../src/mcp/schemas.js";
 import { toolDefinitions } from "../../src/mcp/tools.js";
+import { daysFromNow } from "../helpers/stubGhl.js";
 import pkg from "../../package.json";
 
 const expectedTools: ToolName[] = [
@@ -37,6 +38,11 @@ const expectedTools: ToolName[] = [
   "post_to_youtube",
   "post_to_linkedin",
   "post_to_tiktok",
+  "schedule_social_post",
+  "list_social_posts",
+  "get_social_post",
+  "update_social_post",
+  "delete_social_post",
 ];
 
 describe("server metadata", () => {
@@ -48,7 +54,7 @@ describe("server metadata", () => {
 });
 
 describe("tool catalogue", () => {
-  it("declares the expected 32 tools", () => {
+  it("declares the expected 37 tools", () => {
     expect(toolDefinitions.length).toBe(expectedTools.length);
     const names = toolDefinitions.map((t) => t.name);
     for (const name of expectedTools) {
@@ -275,5 +281,53 @@ describe("social posting schemas", () => {
         privacyLevel: "SELF_ONLY", allowComments: false, allowDuet: false, allowStitch: false,
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("social lifecycle schemas", () => {
+  it("rejects a schedule date in the past", () => {
+    expect(
+      toolSchemas.schedule_social_post.safeParse({ postId: "p1", scheduleDate: daysFromNow(-1) }).success,
+    ).toBe(false);
+  });
+
+  it("rejects an unparseable schedule date", () => {
+    expect(
+      toolSchemas.schedule_social_post.safeParse({ postId: "p1", scheduleDate: "next tuesday" }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a future ISO 8601 schedule date", () => {
+    expect(
+      toolSchemas.schedule_social_post.safeParse({ postId: "p1", scheduleDate: daysFromNow(1) }).success,
+    ).toBe(true);
+  });
+
+  it("requires at least one editable field on update_social_post", () => {
+    expect(toolSchemas.update_social_post.safeParse({ postId: "p1" }).success).toBe(false);
+    expect(toolSchemas.update_social_post.safeParse({ postId: "p1", summary: "new" }).success).toBe(true);
+  });
+
+  // Rescheduling belongs to schedule_social_post; an edit must not move the time.
+  it("gives update_social_post no way to express a schedule", () => {
+    const result = toolSchemas.update_social_post.safeParse({
+      postId: "p1",
+      summary: "new",
+      scheduleDate: daysFromNow(1),
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect("scheduleDate" in result.data).toBe(false);
+  });
+
+  it("bounds the list limit", () => {
+    expect(toolSchemas.list_social_posts.safeParse({ limit: 0 }).success).toBe(false);
+    expect(toolSchemas.list_social_posts.safeParse({ limit: 500 }).success).toBe(false);
+    expect(toolSchemas.list_social_posts.safeParse({}).success).toBe(true);
+    expect(toolSchemas.list_social_posts.safeParse({ status: "draft", platform: "tiktok" }).success).toBe(true);
+  });
+
+  it("rejects a post id carrying path traversal", () => {
+    expect(toolSchemas.get_social_post.safeParse({ postId: "../accounts" }).success).toBe(false);
+    expect(toolSchemas.delete_social_post.safeParse({ postId: "../accounts" }).success).toBe(false);
   });
 });
