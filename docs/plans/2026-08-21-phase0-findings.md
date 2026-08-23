@@ -113,3 +113,101 @@ internal accounts call.
 - `posts/list` → **201**, `results.posts: []`, `results.count: 0`. Contract confirmed.
 - Accounts endpoint → 401, unchanged. Not a version or parameter problem.
 - Social Planner queue is empty, so account IDs must come from the UI (see Unknowns 3 and 4).
+
+
+---
+
+# Run 4 (2026-08-21) — the sweep that mattered
+
+Probing `type` with an invalid value did not produce an enum error: GHL returned **201 with every
+post**. `type` is therefore not validated as an enum — unrecognised values fall through to "no
+filter". That accident is what exposed the real data.
+
+## `type` semantics — confirmed by observation
+
+| `type` | Result |
+|---|---|
+| omitted | all 4 posts |
+| `"__invalid__"` | all 4 posts (not validated) |
+| `"all"` | all 4 posts |
+| `"draft"` | all 4 posts (all are drafts) |
+| `"recent"` | **0 posts** |
+| `"scheduled"` | 0 posts |
+| `"published"` | 0 posts |
+
+`type: "recent"` does not mean "recently created" — it excludes drafts. The first three runs
+returned empty not because the queue was empty, but because the query was wrong.
+
+**Consequence:** `list_social_posts` maps its `status` filter onto `type`, and omits `type`
+entirely when no status is given. It must **not** send a `status` body field — see below.
+
+## Unknown properties are rejected
+
+The earlier 422 said `"property accountIds should not exist"`. The list endpoint accepts `type`,
+`skip`, `limit` and rejects anything it does not know. The plan's `status`, `fromDate` and
+`toDate` body fields are therefore **unverified and likely to 422**. They must be probed before
+use; until then `list_social_posts` filters by date client-side or not at all.
+
+## FINDING 1 — account ids exceed the GHL id pattern
+
+Account ids are composite, and long:
+
+| Length | Account id |
+|---|---|
+| 66 | `672026bf28227a4ad848c4c9_fLBMWEE3c8MDKYcRUrkT_110529568590140_page` |
+| 63 | `672026dafe29d73d8756928c_fLBMWEE3c8MDKYcRUrkT_17841456206520676` |
+| 89 | `6760e2080c50c90d8156bf54_fLBMWEE3c8MDKYcRUrkT_0005lhkjde6208eDRzn0iXr3IbEZ6JSu3Nd_profile` |
+| 78 | `6760e225ec34a09b7bbe13c3_fLBMWEE3c8MDKYcRUrkT_UCUUuWuvLIuWlmoztI1CdzBg_profile` |
+| 64 | `69aa04c797a83e5e07284156_fLBMWEE3c8MDKYcRUrkT_YruoyrmwoK_profile` |
+
+The shape is `{objectId}_{locationId}_{platformNativeId}_{suffix}`.
+
+`GHL_ID_PATTERN` is `/^[a-zA-Z0-9_-]{1,64}$/`. **Three of the five exceed 64 characters.** Had the
+schemas used the existing `ghlId` for `accountIds`, as planned, every posting call to YouTube,
+TikTok, and Facebook would have failed validation before leaving the Worker — and the error would
+have looked like a caller mistake rather than a schema bug.
+
+**Consequence:** a distinct `socialAccountId` type, same safe charset, 128-character ceiling. Post
+ids stay on `ghlId` — they are 24-character Mongo ObjectIds and do travel in URL paths, where the
+tighter bound is the point.
+
+## FINDING 2 — the real `*PostDetails` field names
+
+Read off live post objects, correcting several guesses in the plan:
+
+| Block | Actual fields | Plan had |
+|---|---|---|
+| `tiktokPostDetails` | `privacyLevel`, `enableComment`, `enableDuet`, `enableStitch`, `promoteOtherBrand`, `promoteYourBrand`, `videoDisclosure` | `allowComment`, `allowDuet`, `allowStitch` — **wrong** |
+| `linkedinPostDetails` | `postAsPdf`, `pdfTitle` | `documentPost` — **wrong** |
+| `instagramPostDetails` | `type`, `collaborators` (an **object**, not an array), `publishViaPushNotification`, `publisherNote`, `showOnFeed` | `collaborators: []` — **wrong shape** |
+| `youtubePostDetails` | `privacyLevel`, `title`, `type: "video"` | correct |
+| `facebookPostDetails` | `type: "post"` | empty object — incomplete |
+
+Post-level fields confirmed present: `status`, `type`, `summary`, `scheduleDate`, `publishedAt`,
+`followUpComment`, `accountIds`, `media[{url,type,thumbnail}]`, `tags`.
+
+## FINDING 3 — post `platform` is not a reliable account→platform map
+
+All four drafts report `platform: "google"` while carrying account ids that are plainly YouTube
+(`UC…`), Instagram (`17841…`), TikTok (`0005…`), Facebook (`…_page`) and one more. The post-level
+`platform` field cannot be used to derive which platform an account belongs to.
+
+Mapping inferred from the platform-native id embedded in each account id, **pending confirmation
+by the operator**:
+
+| Account id fragment | Inferred platform | Reasoning |
+|---|---|---|
+| `…_110529568590140_page` | Facebook | numeric Page id with a `_page` suffix |
+| `…_17841456206520676` | Instagram | `17841…` is the Instagram Business account id prefix |
+| `…_0005lhkjde…IbEZ6JSu3Nd_profile` | TikTok | TikTok `open_id` format |
+| `…_UCUUuWuvLIuWlmoztI1CdzBg_profile` | YouTube | `UC` prefix is a YouTube channel id |
+| `…_YruoyrmwoK_profile` | LinkedIn | short alphanumeric member id; the only platform left |
+
+This mapping feeds `GHL_SOCIAL_ACCOUNTS` and drives `assertAccountsBelongTo`. A wrong entry would
+either block a legitimate post or let one through aimed at the wrong network, so it is confirmed
+with the operator rather than assumed.
+
+## Still open
+
+Unknowns 3 (external media URLs) and 4 (publish-now semantics) remain. An account id is now
+available, so `--create-draft` can finally run.

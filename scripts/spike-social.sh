@@ -69,6 +69,15 @@ for T in recent scheduled draft published all; do
     "{\"type\":\"$T\",\"skip\":\"0\",\"limit\":\"20\"}" "list-posts-$T.json"
 done
 
+# Unknown properties are rejected outright ("property accountIds should not
+# exist"), so every filter field the implementation wants to send must be
+# proven accepted rather than assumed.
+echo '### Which filter fields does posts/list actually accept?'
+call "probe status field" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
+  '{"status":"draft","skip":"0","limit":"5"}'
+call "probe date window" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
+  '{"type":"all","fromDate":"2026-08-01T00:00:00Z","toDate":"2026-08-31T00:00:00Z","skip":"0","limit":"5"}'
+
 echo "### list posts with no type at all"
 call "list posts no type" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
   '{"skip":"0","limit":"20"}' "list-posts-notype.json"
