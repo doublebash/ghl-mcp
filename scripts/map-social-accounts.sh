@@ -23,14 +23,30 @@ BASE="https://services.leadconnectorhq.com"
 OUT="tests/fixtures/social"
 mkdir -p "$OUT"
 
-# Account ids harvested from the posts/list sweep. Replace if yours differ.
-ACCOUNTS=(
-  "672026bf28227a4ad848c4c9_${GHL_LOCATION_ID}_110529568590140_page"
-  "672026dafe29d73d8756928c_${GHL_LOCATION_ID}_17841456206520676"
-  "6760e2080c50c90d8156bf54_${GHL_LOCATION_ID}_0005lhkjde6208eDRzn0iXr3IbEZ6JSu3Nd_profile"
-  "6760e225ec34a09b7bbe13c3_${GHL_LOCATION_ID}_UCUUuWuvLIuWlmoztI1CdzBg_profile"
-  "69aa04c797a83e5e07284156_${GHL_LOCATION_ID}_YruoyrmwoK_profile"
-)
+# Account ids are read from the gitignored spike fixtures, or from
+# SOCIAL_ACCOUNT_IDS (comma-separated) — never hardcoded, so this file carries
+# no one's account identifiers into a public repo.
+if [ -n "${SOCIAL_ACCOUNT_IDS:-}" ]; then
+  IFS=',' read -r -a ACCOUNTS <<< "$SOCIAL_ACCOUNT_IDS"
+else
+  mapfile -t ACCOUNTS < <(python3 -c '
+import glob, json
+ids = set()
+for path in glob.glob("tests/fixtures/social/list-posts*.json"):
+    try:
+        data = json.load(open(path))
+    except Exception:
+        continue
+    for post in (data.get("results") or {}).get("posts") or []:
+        ids.update(post.get("accountIds") or [])
+print("\n".join(sorted(ids)))
+')
+fi
+
+if [ "${#ACCOUNTS[@]}" -eq 0 ]; then
+  echo "No account ids found. Run scripts/spike-social.sh first, or set SOCIAL_ACCOUNT_IDS." >&2
+  exit 1
+fi
 
 PLATFORMS=(facebook instagram linkedin tiktok youtube)
 

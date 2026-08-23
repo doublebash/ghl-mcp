@@ -218,8 +218,8 @@ describe("upstream failures surface as safe errors", () => {
 
 describe("list_social_accounts", () => {
   const CONFIGURED = [
-    { id: "672026bf28227a4ad848c4c9_loc123_110529568590140_page", platform: "facebook", name: "Page" },
-    { id: "6760e225ec34a09b7bbe13c3_loc123_UCUUuWuvLIuWlmoztI1CdzBg_profile", platform: "youtube", name: "Channel" },
+    { id: "aaaa0000aaaa0000aaaa0001_loc123_100000000000001_page", platform: "facebook", name: "Page" },
+    { id: "aaaa0000aaaa0000aaaa0004_loc123_UCaaaaaaaaaaaaaaaaaaaaaa_profile", platform: "youtube", name: "Channel" },
     { id: "tw-1", platform: "twitter", name: "@x" },
   ];
   const env = { ...TEST_ENV, GHL_SOCIAL_ACCOUNTS: JSON.stringify(CONFIGURED) };
@@ -251,8 +251,8 @@ describe("list_social_accounts", () => {
 });
 
 describe("posting tools", () => {
-  const FB = "672026bf28227a4ad848c4c9_loc123_110529568590140_page";
-  const YT = "6760e225ec34a09b7bbe13c3_loc123_UCUUuWuvLIuWlmoztI1CdzBg_profile";
+  const FB = "aaaa0000aaaa0000aaaa0001_loc123_100000000000001_page";
+  const YT = "aaaa0000aaaa0000aaaa0004_loc123_UCaaaaaaaaaaaaaaaaaaaaaa_profile";
   const env = {
     ...TEST_ENV,
     GHL_SOCIAL_ACCOUNTS: JSON.stringify([
@@ -260,7 +260,7 @@ describe("posting tools", () => {
       { id: YT, platform: "youtube", name: "Channel" },
     ]),
   };
-  const created = { results: { post: { _id: "6a8ab7c5f52259e0b0caa3c4", status: "draft" } } };
+  const created = { results: { post: { _id: "6a8a000000000000000aaa3b", status: "draft" } } };
 
   it("builds a youtube post with the confirmed details block", async () => {
     stub = stubGhl({ "POST /social-media-posting/loc123/posts": created });
@@ -310,8 +310,8 @@ describe("posting tools", () => {
 
 describe("social lifecycle tools", () => {
   const LIST = "POST /social-media-posting/loc123/posts/list";
-  const ONE = "/social-media-posting/loc123/posts/6a8ab4a4420254dd183aab3a";
-  const POST_ID = "6a8ab4a4420254dd183aab3a";
+  const ONE = "/social-media-posting/loc123/posts/6a8a000000000000000aaa3a";
+  const POST_ID = "6a8a000000000000000aaa3a";
 
   it("reports GHL's own count when the page is only part of the queue", async () => {
     stub = stubGhl({ [LIST]: { results: { posts: [{ _id: "p1" }, { _id: "p2" }], count: 380 } } });

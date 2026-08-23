@@ -188,9 +188,12 @@ describe("custom fields", () => {
 
 describe("social posting schemas", () => {
   const media = [{ url: "https://example.com/a.jpg" }];
-  // A real account id from the Phase 0 spike: 78 characters, which the standard
-  // GHL id pattern (max 64) would reject outright.
-  const REAL_ID = "6760e225ec34a09b7bbe13c3_fLBMWEE3c8MDKYcRUrkT_UCUUuWuvLIuWlmoztI1CdzBg_profile";
+  // Shaped exactly like a real account id from the Phase 0 spike —
+  // {objectId}_{locationId}_{platformNativeId}_{suffix} — which runs to 78
+  // characters and would be rejected outright by the standard GHL id pattern
+  // (max 64). Identifiers are synthetic; the length is the point.
+  const REAL_ID =
+    "aaaa0000aaaa0000aaaa0004_loc1234567890abcdefg_UCaaaaaaaaaaaaaaaaaaaaaa_profile";
 
   it("accepts real account ids, which run past the 64-char GHL id limit", () => {
     expect(REAL_ID.length).toBeGreaterThan(64);

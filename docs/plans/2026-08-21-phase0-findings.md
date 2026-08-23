@@ -1,7 +1,7 @@
 # Phase 0 findings — Social Planner API
 
 **Date:** 2026-08-21
-**Run:** `scripts/spike-social.sh` (read-only probes), location `fLBMWEE3c8MDKYcRUrkT`
+**Run:** `scripts/spike-social.sh` (read-only probes), location `loc123`
 
 ## Unknown 1 — does the PIT authenticate against `/social-media-posting/*`?
 
@@ -154,11 +154,11 @@ Account ids are composite, and long:
 
 | Length | Account id |
 |---|---|
-| 66 | `672026bf28227a4ad848c4c9_fLBMWEE3c8MDKYcRUrkT_110529568590140_page` |
-| 63 | `672026dafe29d73d8756928c_fLBMWEE3c8MDKYcRUrkT_17841456206520676` |
-| 89 | `6760e2080c50c90d8156bf54_fLBMWEE3c8MDKYcRUrkT_0005lhkjde6208eDRzn0iXr3IbEZ6JSu3Nd_profile` |
-| 78 | `6760e225ec34a09b7bbe13c3_fLBMWEE3c8MDKYcRUrkT_UCUUuWuvLIuWlmoztI1CdzBg_profile` |
-| 64 | `69aa04c797a83e5e07284156_fLBMWEE3c8MDKYcRUrkT_YruoyrmwoK_profile` |
+| 66 | `aaaa0000aaaa0000aaaa0001_loc123_100000000000001_page` |
+| 63 | `aaaa0000aaaa0000aaaa0002_loc123_17841000000000002` |
+| 89 | `aaaa0000aaaa0000aaaa0003_loc123_0005aaaaaa0000aAaaAa0aAa0aAAAA0AAa0_profile` |
+| 78 | `aaaa0000aaaa0000aaaa0004_loc123_UCaaaaaaaaaaaaaaaaaaaaaa_profile` |
+| 64 | `aaaa0000aaaa0000aaaa0005_loc123_LiPerson1_profile` |
 
 The shape is `{objectId}_{locationId}_{platformNativeId}_{suffix}`.
 
@@ -197,11 +197,11 @@ by the operator**:
 
 | Account id fragment | Inferred platform | Reasoning |
 |---|---|---|
-| `…_110529568590140_page` | Facebook | numeric Page id with a `_page` suffix |
-| `…_17841456206520676` | Instagram | `17841…` is the Instagram Business account id prefix |
+| `…_100000000000001_page` | Facebook | numeric Page id with a `_page` suffix |
+| `…_17841000000000002` | Instagram | `17841…` is the Instagram Business account id prefix |
 | `…_0005lhkjde…IbEZ6JSu3Nd_profile` | TikTok | TikTok `open_id` format |
-| `…_UCUUuWuvLIuWlmoztI1CdzBg_profile` | YouTube | `UC` prefix is a YouTube channel id |
-| `…_YruoyrmwoK_profile` | LinkedIn | short alphanumeric member id; the only platform left |
+| `…_UCaaaaaaaaaaaaaaaaaaaaaa_profile` | YouTube | `UC` prefix is a YouTube channel id |
+| `…_LiPerson1_profile` | LinkedIn | short alphanumeric member id; the only platform left |
 
 This mapping feeds `GHL_SOCIAL_ACCOUNTS` and drives `assertAccountsBelongTo`. A wrong entry would
 either block a legitimate post or let one through aimed at the wrong network, so it is confirmed
@@ -273,13 +273,13 @@ library.
 Request that succeeded:
 
 ```json
-{"accountIds":["…_110529568590140_page"],"userId":"dgBW5AeFDwdZSUhRMSD9",
+{"accountIds":["…_100000000000001_page"],"userId":"user456",
  "type":"post","status":"draft","summary":"…","media":[{"url":"https://picsum.photos/1080"}]}
 ```
 
 - `status: "draft"` is accepted on create and the post comes back `status: "draft"` — it stages in
   the Social Planner and does not publish.
-- The created post id is `6a8ab7c5f52259e0b0caa3c4` — a 24-character Mongo ObjectId, which fits
+- The created post id is `6a8a000000000000000aaa3b` — a 24-character Mongo ObjectId, which fits
   `GHL_ID_PATTERN`. Post ids stay on `ghlId`; only account ids need the wider type.
 - Response nests the post at `results.post`, matching what `createPost` already parses.
 
@@ -297,7 +297,7 @@ exercise when the operator chooses to make a real post.
 ## FINDING 3 revisited — `platform` is junk, and my inference is weaker than it looked
 
 The draft was created against the account id I had inferred as **Facebook**
-(`…_110529568590140_page`). GHL labelled the resulting post `platform: "google"`.
+(`…_100000000000001_page`). GHL labelled the resulting post `platform: "google"`.
 
 Two readings:
 
@@ -315,3 +315,39 @@ one aimed at the wrong network.
 
 Until confirmed, `GHL_SOCIAL_ACCOUNTS` stays unset and `list_social_accounts` reports a
 configuration error rather than a wrong answer.
+
+
+---
+
+# Run 7 (2026-08-21) — account → platform mapping RESOLVED
+
+`GET /social-media-posting/oauth/{locationId}/{platform}/accounts/{connectionId}` is covered by
+`socialplanner/oauth.readonly`, which this token has. Probing each connection id against each
+platform returns that platform's own view of the connection — and where it succeeds, the native id
+it reports matches the id embedded in the account id exactly.
+
+Note the endpoints answer **200 even on failure**, with `success: false` and an error code in the
+body. Status codes are not the discriminator here; the body is.
+
+| Platform | Evidence | Confidence |
+|---|---|---|
+| Facebook | FB endpoint returned the same Page id embedded in the account id, with the page name | **Confirmed** |
+| Instagram | IG endpoint returned the same Instagram Business account id, with the handle | **Confirmed** |
+| LinkedIn | LinkedIn endpoint returned `urn:li:person:<id>` matching the embedded id, with the profile name | **Confirmed** |
+| YouTube | GHL's YouTube endpoint returns `YOUTUBE_API_ERROR` for every connection, so nothing contradicts it; the embedded id is `UC` + 22 characters, which is definitively a YouTube channel id | Strong |
+| TikTok | GHL's TikTok endpoint returns an empty profile list for every connection; the embedded id is TikTok `open_id` format, and it is the only account unaccounted for | Strong |
+
+Three are confirmed by exact cross-reference against each platform's own API. The remaining two
+rest on unambiguous id formats plus elimination, with no contradicting evidence — GHL's endpoints
+for those two are broken for every connection, not just these.
+
+FINDING 3's earlier doubt is resolved: post-level `platform` really is junk. One post targeting an
+Instagram Business account reported `platform: "google"`, and Instagram is Meta — the field cannot
+be per-account truth.
+
+## Note on identifiers
+
+Real location, user, and account identifiers appear only in `tests/fixtures/social/`, which is
+gitignored. Tracked files — tests, docs, scripts — use synthetic values of the same shape. The
+account-mapping script reads ids from those fixtures or from `SOCIAL_ACCOUNT_IDS` rather than
+carrying any.

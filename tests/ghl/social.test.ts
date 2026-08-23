@@ -155,8 +155,8 @@ describe("assertAccountsBelongTo", () => {
 // Shapes below mirror tests/fixtures/social/list-posts-draft.json — real GHL
 // responses captured in the Phase 0 spike, not invented ones.
 const POSTS_PATH_FULL = "/social-media-posting/loc123/posts";
-const FB_ID = "672026bf28227a4ad848c4c9_loc123_110529568590140_page";
-const YT_ID = "6760e225ec34a09b7bbe13c3_loc123_UCUUuWuvLIuWlmoztI1CdzBg_profile";
+const FB_ID = "aaaa0000aaaa0000aaaa0001_loc123_100000000000001_page";
+const YT_ID = "aaaa0000aaaa0000aaaa0004_loc123_UCaaaaaaaaaaaaaaaaaaaaaa_profile";
 
 const REAL_ACCOUNTS = JSON.stringify([
   { id: FB_ID, platform: "facebook", name: "Bashco Page" },
@@ -167,7 +167,7 @@ const realEnv = { ...TEST_ENV, GHL_SOCIAL_ACCOUNTS: REAL_ACCOUNTS };
 const createdBody = {
   success: true,
   statusCode: 201,
-  results: { post: { _id: "6a8ab4a4420254dd183aab3a", status: "draft", summary: "hello" } },
+  results: { post: { _id: "6a8a000000000000000aaa3a", status: "draft", summary: "hello" } },
 };
 
 describe("createPost", () => {
@@ -184,7 +184,7 @@ describe("createPost", () => {
       details: { youtubePostDetails: { title: "My video", privacyLevel: "private", type: "video" } },
     });
 
-    expect(post.id).toBe("6a8ab4a4420254dd183aab3a");
+    expect(post.id).toBe("6a8a000000000000000aaa3a");
     expect(post._id).toBeUndefined();
 
     const body = stub.only().body as Record<string, unknown>;
@@ -260,8 +260,8 @@ describe("createPost", () => {
 });
 
 const LIST_PATH = "/social-media-posting/loc123/posts/list";
-const ONE_POST_PATH = "/social-media-posting/loc123/posts/6a8ab4a4420254dd183aab3a";
-const POST_ID = "6a8ab4a4420254dd183aab3a";
+const ONE_POST_PATH = "/social-media-posting/loc123/posts/6a8a000000000000000aaa3a";
+const POST_ID = "6a8a000000000000000aaa3a";
 
 describe("listPosts", () => {
   it("normalises _id to id and reports GHL's own count as the total", async () => {
