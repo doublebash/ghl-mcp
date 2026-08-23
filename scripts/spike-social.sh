@@ -55,18 +55,38 @@ done
 # Contract confirmed by the 2026-08-21 422: skip/limit are NUMBER STRINGS and
 # accountIds is rejected outright. Existing posts carry their accountIds, which
 # is how account ids are obtained while the accounts endpoint is scope-blocked.
-echo "### Unknown 5 — list posts shape (also: harvest account ids)"
-call "list posts" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
-  '{"type":"recent","skip":"0","limit":"20"}' "list-posts.json"
+#
+# GHL validates with NestJS class-validator (the 422 said "must be a number
+# string"), so an invalid enum value makes it enumerate the valid ones. Cheaper
+# than guessing which `type` exposes drafts.
+echo "### Discovering the valid values for `type`"
+call "type enum probe" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
+  '{"type":"__invalid__","skip":"0","limit":"5"}'
 
-if [ -f "$OUT/list-posts.json" ]; then
-  echo "### Account ids seen in existing posts"
-  python3 -c 'import json,sys
-data = json.load(open(sys.argv[1]))
-posts = data.get("posts") or (data.get("results") or {}).get("posts") or []
-rows = sorted({(a, p.get("platform","?")) for p in posts for a in (p.get("accountIds") or [])})
-print(json.dumps([{"id": i, "platform": pl} for i, pl in rows], indent=2) if rows else "no accountIds in the returned posts")' "$OUT/list-posts.json" || true
-fi
+echo "### Unknown 5 — list posts across every plausible type (also: harvest account ids)"
+for T in recent scheduled draft published all; do
+  call "list posts type=$T" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
+    "{\"type\":\"$T\",\"skip\":\"0\",\"limit\":\"20\"}" "list-posts-$T.json"
+done
+
+echo "### list posts with no type at all"
+call "list posts no type" POST "/social-media-posting/$GHL_LOCATION_ID/posts/list" "2021-07-28" \
+  '{"skip":"0","limit":"20"}' "list-posts-notype.json"
+
+echo "### Account ids seen across every list response"
+python3 -c 'import glob, json, sys
+rows = set()
+for path in glob.glob(sys.argv[1] + "/list-posts*.json"):
+    try:
+        data = json.load(open(path))
+    except Exception:
+        continue
+    posts = data.get("posts") or (data.get("results") or {}).get("posts") or []
+    for p in posts:
+        for a in (p.get("accountIds") or []):
+            rows.add((a, p.get("platform", "?")))
+print(json.dumps([{"id": i, "platform": pl} for i, pl in sorted(rows)], indent=2) if rows
+      else "No accountIds found in any list response.\nIf you have NOT created a draft in the Social Planner UI yet, do that first.\nIf you HAVE, check the type enum probe above for the value that exposes drafts.")' "$OUT" || true
 
 if [ "$CREATE_DRAFT" = "1" ]; then
   : "${ACCOUNT_ID:?set ACCOUNT_ID to a facebook or linkedin id from the accounts response}"
