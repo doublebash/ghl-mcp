@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ToolError } from "@bashco/mcp-toolkit";
-import { assertAccountsBelongTo, listSocialAccounts, socialFetch } from "../../src/ghl/social.js";
+import {
+  assertAccountsBelongTo,
+  createPost,
+  listSocialAccounts,
+  socialFetch,
+} from "../../src/ghl/social.js";
 import { errorResponse, stubGhl, TEST_ENV } from "../helpers/stubGhl.js";
 
 let stub: ReturnType<typeof stubGhl>;
@@ -139,5 +144,112 @@ describe("assertAccountsBelongTo", () => {
     await expect(
       assertAccountsBelongTo(configEnv, "facebook", ["fb-1", "li-1"]),
     ).rejects.toBeInstanceOf(ToolError);
+  });
+});
+
+// Shapes below mirror tests/fixtures/social/list-posts-draft.json — real GHL
+// responses captured in the Phase 0 spike, not invented ones.
+const POSTS_PATH_FULL = "/social-media-posting/loc123/posts";
+const FB_ID = "672026bf28227a4ad848c4c9_loc123_110529568590140_page";
+const YT_ID = "6760e225ec34a09b7bbe13c3_loc123_UCUUuWuvLIuWlmoztI1CdzBg_profile";
+
+const REAL_ACCOUNTS = JSON.stringify([
+  { id: FB_ID, platform: "facebook", name: "Bashco Page" },
+  { id: YT_ID, platform: "youtube", name: "Bashco" },
+]);
+const realEnv = { ...TEST_ENV, GHL_SOCIAL_ACCOUNTS: REAL_ACCOUNTS };
+
+const createdBody = {
+  success: true,
+  statusCode: 201,
+  results: { post: { _id: "6a8ab4a4420254dd183aab3a", status: "draft", summary: "hello" } },
+};
+
+describe("createPost", () => {
+  it("sends the platform details block and normalises _id to id", async () => {
+    stub = stubGhl({ [`POST ${POSTS_PATH_FULL}`]: createdBody });
+
+    const post = await createPost(realEnv, {
+      platform: "youtube",
+      accountIds: [YT_ID],
+      type: "post",
+      status: "draft",
+      summary: "hello",
+      media: [{ url: "https://example.com/v.mp4" }],
+      details: { youtubePostDetails: { title: "My video", privacyLevel: "private", type: "video" } },
+    });
+
+    expect(post.id).toBe("6a8ab4a4420254dd183aab3a");
+    expect(post._id).toBeUndefined();
+
+    const body = stub.only().body as Record<string, unknown>;
+    expect(body.accountIds).toEqual([YT_ID]);
+    expect(body.status).toBe("draft");
+    expect(body.type).toBe("post");
+    expect(body.youtubePostDetails).toEqual({
+      title: "My video",
+      privacyLevel: "private",
+      type: "video",
+    });
+  });
+
+  // GHL rejects a create without one: "userId must be a string / should not be empty".
+  it("always sends userId, which GHL requires", async () => {
+    stub = stubGhl({ [`POST ${POSTS_PATH_FULL}`]: createdBody });
+    await createPost(realEnv, {
+      platform: "facebook",
+      accountIds: [FB_ID],
+      type: "post",
+      status: "draft",
+      summary: "hi",
+      details: {},
+    });
+
+    expect((stub.only().body as Record<string, unknown>).userId).toBe("user456");
+  });
+
+  it("refuses an account belonging to another platform before calling GHL", async () => {
+    stub = stubGhl({});
+    await expect(
+      createPost(realEnv, {
+        platform: "youtube",
+        accountIds: [FB_ID],
+        type: "post",
+        status: "draft",
+        details: {},
+      }),
+    ).rejects.toBeInstanceOf(ToolError);
+
+    expect(stub.calls).toHaveLength(0);
+  });
+
+  it("reports a safe error when GHL returns no post object", async () => {
+    stub = stubGhl({ [`POST ${POSTS_PATH_FULL}`]: { success: true, results: {} } });
+    await expect(
+      createPost(realEnv, {
+        platform: "facebook",
+        accountIds: [FB_ID],
+        type: "post",
+        status: "draft",
+        summary: "hi",
+        details: {},
+      }),
+    ).rejects.toBeInstanceOf(ToolError);
+  });
+
+  it("omits optional fields rather than sending undefined", async () => {
+    stub = stubGhl({ [`POST ${POSTS_PATH_FULL}`]: createdBody });
+    await createPost(realEnv, {
+      platform: "facebook",
+      accountIds: [FB_ID],
+      type: "post",
+      status: "published",
+      summary: "text only",
+      details: {},
+    });
+
+    const body = stub.only().body as Record<string, unknown>;
+    expect("media" in body).toBe(false);
+    expect("followUpComment" in body).toBe(false);
   });
 });

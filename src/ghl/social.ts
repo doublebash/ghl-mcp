@@ -4,9 +4,16 @@ import {
   type UpstreamRequestInit,
 } from "@bashco/mcp-toolkit";
 import { ToolError } from "@bashco/mcp-toolkit";
-import { GHL_BASE_URL, SOCIAL_API_VERSION, SOCIAL_PLATFORMS, type SocialPlatform } from "../constants.js";
+import {
+  GHL_BASE_URL,
+  SOCIAL_API_VERSION,
+  SOCIAL_PLATFORMS,
+  type AuthorableStatus,
+  type SocialPlatform,
+} from "../constants.js";
 import type { GHLApiEnv } from "../env.js";
-import type { SocialAccount } from "./types.js";
+import { buildPath } from "./path.js";
+import type { MediaItem, SocialAccount, SocialPost } from "./types.js";
 
 // GHL answers 401 for two quite different causes on these endpoints: a private
 // integration token missing a socialplanner scope, and a connected social
@@ -133,4 +140,66 @@ export async function assertAccountsBelongTo(
       );
     }
   }
+}
+
+export interface CreatePostInput {
+  platform: SocialPlatform;
+  accountIds: string[];
+  type: "post" | "story" | "reel";
+  status: AuthorableStatus;
+  summary?: string;
+  media?: MediaItem[];
+  followUpComment?: string;
+  /** Platform-specific block, e.g. { youtubePostDetails: {...} }, built in platforms.ts. */
+  details: Record<string, unknown>;
+}
+
+/**
+ * GHL returns posts with a Mongo `_id`. Renaming it to `id` keeps every tool
+ * result on one convention, matching what search_tasks already does.
+ */
+function normalisePost(raw: unknown): SocialPost | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const record = raw as Record<string, unknown>;
+  const id =
+    typeof record._id === "string" ? record._id : typeof record.id === "string" ? record.id : "";
+  if (id === "") return null;
+
+  const rest = { ...record };
+  delete rest._id;
+  return { ...rest, id };
+}
+
+export async function createPost(env: GHLApiEnv, input: CreatePostInput): Promise<SocialPost> {
+  await assertAccountsBelongTo(env, input.platform, input.accountIds);
+
+  const data = await socialFetch<{ results?: { post?: unknown } }>(env, {
+    method: "POST",
+    path: buildPath("/social-media-posting/{locationId}/posts", {
+      locationId: env.GHL_LOCATION_ID,
+    }),
+    body: {
+      accountIds: input.accountIds,
+      type: input.type,
+      status: input.status,
+      // Required: GHL 422s with "userId must be a string / should not be empty".
+      userId: env.GHL_USER_ID,
+      ...(input.summary !== undefined ? { summary: input.summary } : {}),
+      ...(input.media !== undefined ? { media: input.media } : {}),
+      ...(input.followUpComment !== undefined ? { followUpComment: input.followUpComment } : {}),
+      ...input.details,
+    },
+  });
+
+  const post = normalisePost(data?.results?.post);
+  if (post === null) {
+    throw new ToolError({
+      userMessage:
+        "GoHighLevel accepted the request but returned no post — check the Social Planner before retrying, " +
+        "so you do not end up posting twice",
+      internalMessage: `unexpected create-post response: ${JSON.stringify(data).slice(0, 512)}`,
+      status: 502,
+    });
+  }
+  return post;
 }
