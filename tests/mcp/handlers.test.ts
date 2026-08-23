@@ -248,3 +248,61 @@ describe("list_social_accounts", () => {
     ).rejects.toMatchObject({ status: 500 });
   });
 });
+
+describe("posting tools", () => {
+  const FB = "672026bf28227a4ad848c4c9_loc123_110529568590140_page";
+  const YT = "6760e225ec34a09b7bbe13c3_loc123_UCUUuWuvLIuWlmoztI1CdzBg_profile";
+  const env = {
+    ...TEST_ENV,
+    GHL_SOCIAL_ACCOUNTS: JSON.stringify([
+      { id: FB, platform: "facebook", name: "Page" },
+      { id: YT, platform: "youtube", name: "Channel" },
+    ]),
+  };
+  const created = { results: { post: { _id: "6a8ab7c5f52259e0b0caa3c4", status: "draft" } } };
+
+  it("builds a youtube post with the confirmed details block", async () => {
+    stub = stubGhl({ "POST /social-media-posting/loc123/posts": created });
+
+    await dispatchToolCall(env, "post_to_youtube", {
+      accountIds: [YT],
+      status: "draft",
+      title: "Launch video",
+      privacy: "unlisted",
+      media: [{ url: "https://example.com/v.mp4" }],
+    });
+
+    const body = stub.only().body as Record<string, unknown>;
+    expect(body.youtubePostDetails).toEqual({
+      title: "Launch video",
+      privacyLevel: "unlisted",
+      type: "video",
+    });
+    expect(body.status).toBe("draft");
+    expect(body.userId).toBe("user456");
+  });
+
+  it("refuses to post to an account from a different platform", async () => {
+    stub = stubGhl({});
+    await expect(
+      dispatchToolCall(env, "post_to_youtube", {
+        accountIds: [FB],
+        status: "draft",
+        title: "t",
+        privacy: "private",
+        media: [{ url: "https://example.com/v.mp4" }],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    expect(stub.calls).toHaveLength(0);
+  });
+
+  it("cannot publish through an omitted status", async () => {
+    stub = stubGhl({});
+    await expect(
+      dispatchToolCall(env, "post_to_facebook", { accountIds: [FB], summary: "hi" }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    expect(stub.calls).toHaveLength(0);
+  });
+});

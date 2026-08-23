@@ -19,7 +19,14 @@ import {
   updateTask,
 } from "../ghl/contacts.js";
 import { getConversationHistory } from "../ghl/conversations.js";
-import { listSocialAccounts } from "../ghl/social.js";
+import {
+  buildFacebookPost,
+  buildInstagramPost,
+  buildLinkedinPost,
+  buildTiktokPost,
+  buildYoutubePost,
+} from "../ghl/platforms.js";
+import { createPost, listSocialAccounts } from "../ghl/social.js";
 import {
   createOpportunity,
   getOpportunities,
@@ -202,5 +209,60 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
       await listSocialAccounts(env),
       "connected social accounts",
       "Disconnect accounts you no longer post to in the Social Planner.",
+    ),
+
+  // Required fields are restated after the compact() spread for the same reason
+  // create_opportunity does it: compact()'s return type is all-optional, which
+  // alone does not satisfy each builder's required properties.
+  post_to_facebook: (env, args) =>
+    createPost(
+      env,
+      buildFacebookPost({ ...compact(args), accountIds: args.accountIds, status: args.status }),
+    ),
+
+  post_to_instagram: (env, args) =>
+    createPost(
+      env,
+      buildInstagramPost({
+        ...compact(args),
+        accountIds: args.accountIds,
+        status: args.status,
+        media: args.media,
+        postType: args.postType,
+      }),
+    ),
+
+  post_to_youtube: (env, args) =>
+    createPost(
+      env,
+      buildYoutubePost({
+        ...compact(args),
+        accountIds: args.accountIds,
+        status: args.status,
+        media: args.media,
+        title: args.title,
+        privacy: args.privacy,
+      }),
+    ),
+
+  post_to_linkedin: (env, args) =>
+    createPost(
+      env,
+      buildLinkedinPost({ ...compact(args), accountIds: args.accountIds, status: args.status }),
+    ),
+
+  post_to_tiktok: (env, args) =>
+    createPost(
+      env,
+      buildTiktokPost({
+        ...compact(args),
+        accountIds: args.accountIds,
+        status: args.status,
+        media: args.media,
+        privacyLevel: args.privacyLevel,
+        allowComments: args.allowComments,
+        allowDuet: args.allowDuet,
+        allowStitch: args.allowStitch,
+      }),
     ),
 };

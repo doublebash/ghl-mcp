@@ -170,4 +170,56 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     "Returns { items, returned, total, truncated }. " +
     "If this reports a configuration error, the account list has not been set up on the server " +
     "yet — that is an operator task, not something to work around by guessing account IDs.",
+
+  post_to_facebook:
+    "Post to a connected Facebook Page through GoHighLevel's Social Planner. " +
+    "Accepts text alone, or text with up to 10 images or one video passed as public https:// URLs. " +
+    "Run list_social_accounts first to get Facebook account IDs — an ID from another platform is rejected. " +
+    "status is REQUIRED and explicit: 'draft' stages the post in the Social Planner for review, " +
+    "'published' posts it immediately and cannot be undone. " +
+    "To schedule for later, create it as a draft and then call schedule_social_post. " +
+    "A successful response means GoHighLevel queued the post, not that Facebook accepted it — " +
+    "call get_social_post to confirm.",
+
+  post_to_instagram:
+    "Post to a connected Instagram Business or Creator account through GoHighLevel's Social Planner. " +
+    "Media is REQUIRED — Instagram rejects text-only posts. Pass public https:// URLs. " +
+    "postType selects the format: 'post' for a feed post or carousel, 'reel' for a Reel, 'story' for a Story. " +
+    "Run list_social_accounts first to get Instagram account IDs. " +
+    "status is REQUIRED and explicit: 'draft' stages the post, 'published' posts immediately and " +
+    "cannot be undone. To schedule for later, create a draft then call schedule_social_post. " +
+    "A successful response means the post was queued, not that Instagram accepted it — " +
+    "confirm with get_social_post.",
+
+  post_to_youtube:
+    "Upload a video to a connected YouTube channel through GoHighLevel's Social Planner. " +
+    "Requires exactly one video as a public https:// URL and a title of 100 characters or fewer; " +
+    "summary becomes the video description. " +
+    "privacy is REQUIRED — 'public', 'unlisted' or 'private' — because it decides whether the whole " +
+    "internet can see the video. Never guess it; ask if it was not specified. " +
+    "Run list_social_accounts first to get the YouTube account ID. " +
+    "status is REQUIRED: 'draft' stages it, 'published' uploads immediately. " +
+    "To schedule for later, create a draft then call schedule_social_post. " +
+    "Video processing is asynchronous — call get_social_post to confirm the upload succeeded.",
+
+  post_to_linkedin:
+    "Post to a connected LinkedIn profile or company page through GoHighLevel's Social Planner. " +
+    "Accepts text alone, text with images, or a PDF document carousel — for a carousel set " +
+    "postAsPdf: true, give pdfTitle, and pass the PDF as the single media item. " +
+    "All media must be public https:// URLs. " +
+    "Run list_social_accounts first to get LinkedIn account IDs. " +
+    "status is REQUIRED and explicit: 'draft' stages the post, 'published' posts immediately and " +
+    "cannot be undone. To schedule for later, create a draft then call schedule_social_post. " +
+    "A successful response means the post was queued, not that LinkedIn accepted it.",
+
+  post_to_tiktok:
+    "Post a video to a connected TikTok account through GoHighLevel's Social Planner. " +
+    "Requires exactly one video as a public https:// URL. " +
+    "privacyLevel, allowComments, allowDuet and allowStitch are all REQUIRED and explicit — TikTok " +
+    "applies them at publish time and they cannot be changed afterwards, so none of them has a " +
+    "safe default to guess. " +
+    "privacyLevel 'PUBLIC_TO_EVERYONE' is visible to anyone; 'SELF_ONLY' stays private on TikTok. " +
+    "Run list_social_accounts first to get the TikTok account ID. " +
+    "status is REQUIRED: 'draft' stages it, 'published' posts immediately. " +
+    "To schedule for later, create a draft then call schedule_social_post.",
 };

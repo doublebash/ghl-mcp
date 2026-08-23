@@ -32,6 +32,11 @@ const expectedTools: ToolName[] = [
   "create_contact",
   "get_contact",
   "list_social_accounts",
+  "post_to_facebook",
+  "post_to_instagram",
+  "post_to_youtube",
+  "post_to_linkedin",
+  "post_to_tiktok",
 ];
 
 describe("server metadata", () => {
@@ -43,7 +48,7 @@ describe("server metadata", () => {
 });
 
 describe("tool catalogue", () => {
-  it("declares the expected 27 tools", () => {
+  it("declares the expected 32 tools", () => {
     expect(toolDefinitions.length).toBe(expectedTools.length);
     const names = toolDefinitions.map((t) => t.name);
     for (const name of expectedTools) {
@@ -172,5 +177,103 @@ describe("custom fields", () => {
       customFields: [{ id: "../evil", field_value: "x" }],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("social posting schemas", () => {
+  const media = [{ url: "https://example.com/a.jpg" }];
+  // A real account id from the Phase 0 spike: 78 characters, which the standard
+  // GHL id pattern (max 64) would reject outright.
+  const REAL_ID = "6760e225ec34a09b7bbe13c3_fLBMWEE3c8MDKYcRUrkT_UCUUuWuvLIuWlmoztI1CdzBg_profile";
+
+  it("accepts real account ids, which run past the 64-char GHL id limit", () => {
+    expect(REAL_ID.length).toBeGreaterThan(64);
+    expect(
+      toolSchemas.post_to_facebook.safeParse({
+        accountIds: [REAL_ID],
+        summary: "hi",
+        status: "draft",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("still rejects an account id carrying path traversal", () => {
+    expect(
+      toolSchemas.post_to_facebook.safeParse({
+        accountIds: ["../../accounts"],
+        summary: "hi",
+        status: "draft",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires an explicit status on every posting tool", () => {
+    expect(toolSchemas.post_to_facebook.safeParse({ accountIds: ["fb-1"], summary: "hi" }).success).toBe(false);
+    expect(
+      toolSchemas.post_to_facebook.safeParse({ accountIds: ["fb-1"], summary: "hi", status: "draft" }).success,
+    ).toBe(true);
+  });
+
+  // Scheduling is schedule_social_post's job, so the posting tools cannot express it.
+  it("does not accept 'scheduled' as an authoring status", () => {
+    expect(
+      toolSchemas.post_to_facebook.safeParse({ accountIds: ["fb-1"], summary: "hi", status: "scheduled" }).success,
+    ).toBe(false);
+  });
+
+  it("rejects media urls that are not https", () => {
+    for (const url of ["http://example.com/a.jpg", "data:image/png;base64,AAAA", "/local/a.jpg"]) {
+      expect(
+        toolSchemas.post_to_instagram.safeParse({
+          accountIds: ["ig-1"],
+          summary: "hi",
+          status: "draft",
+          postType: "post",
+          media: [{ url }],
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("requires media on instagram, youtube and tiktok but not facebook or linkedin", () => {
+    expect(
+      toolSchemas.post_to_instagram.safeParse({
+        accountIds: ["ig-1"], summary: "hi", status: "draft", postType: "post",
+      }).success,
+    ).toBe(false);
+    expect(toolSchemas.post_to_facebook.safeParse({ accountIds: ["fb-1"], summary: "hi", status: "draft" }).success).toBe(true);
+    expect(toolSchemas.post_to_linkedin.safeParse({ accountIds: ["li-1"], summary: "hi", status: "draft" }).success).toBe(true);
+  });
+
+  it("requires exactly one video and a bounded title for youtube", () => {
+    const base = { accountIds: ["yt-1"], status: "draft" as const, privacy: "private" as const };
+    expect(toolSchemas.post_to_youtube.safeParse({ ...base, title: "t", media }).success).toBe(true);
+    expect(toolSchemas.post_to_youtube.safeParse({ ...base, title: "t", media: [...media, ...media] }).success).toBe(false);
+    expect(toolSchemas.post_to_youtube.safeParse({ ...base, media }).success).toBe(false);
+    expect(toolSchemas.post_to_youtube.safeParse({ ...base, title: "x".repeat(101), media }).success).toBe(false);
+  });
+
+  it("requires youtube privacy to be stated, never defaulted", () => {
+    expect(
+      toolSchemas.post_to_youtube.safeParse({ accountIds: ["yt-1"], status: "draft", title: "t", media }).success,
+    ).toBe(false);
+  });
+
+  it("rejects an empty account list", () => {
+    expect(toolSchemas.post_to_facebook.safeParse({ accountIds: [], summary: "hi", status: "draft" }).success).toBe(false);
+  });
+
+  it("requires every tiktok interaction setting to be explicit", () => {
+    expect(
+      toolSchemas.post_to_tiktok.safeParse({
+        accountIds: ["tt-1"], summary: "hi", status: "draft", media, privacyLevel: "SELF_ONLY",
+      }).success,
+    ).toBe(false);
+    expect(
+      toolSchemas.post_to_tiktok.safeParse({
+        accountIds: ["tt-1"], summary: "hi", status: "draft", media,
+        privacyLevel: "SELF_ONLY", allowComments: false, allowDuet: false, allowStitch: false,
+      }).success,
+    ).toBe(true);
   });
 });

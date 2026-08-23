@@ -70,6 +70,12 @@ export const SOCIAL_POST_STATUSES = ["draft", "scheduled", "published"] as const
 // under this version. See docs/plans/2026-08-21-phase0-findings.md.
 export const SOCIAL_API_VERSION = "2021-07-28";
 
+// Social account ids are composite — {objectId}_{locationId}_{platformNativeId}_{suffix} —
+// and run 63-89 characters in practice, well past GHL_ID_PATTERN's 64. Same safe
+// charset, wider ceiling. Post ids keep the tighter pattern: they are 24-character
+// ObjectIds and they travel in URL paths, where the bound is doing real work.
+export const SOCIAL_ACCOUNT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+
 export const MAX_MEDIA_ITEMS = 10;
 export const MAX_SUMMARY_LENGTH = 5000;
 export const MAX_MEDIA_URL_LENGTH = 2048;

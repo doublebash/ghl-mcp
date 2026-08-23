@@ -1,6 +1,12 @@
 import { z } from "zod";
 import {
+  AUTHORABLE_POST_STATUSES,
   GHL_ID_PATTERN,
+  MAX_MEDIA_ITEMS,
+  MAX_MEDIA_URL_LENGTH,
+  MAX_SUMMARY_LENGTH,
+  MAX_YOUTUBE_TITLE_LENGTH,
+  SOCIAL_ACCOUNT_ID_PATTERN,
   MAX_APPOINTMENT_LOOKAHEAD_DAYS,
   MAX_CONTACT_SEARCH_LIMIT,
   MAX_CONVERSATION_LIMIT,
@@ -38,6 +44,29 @@ const customFieldList = z
     }),
   )
   .max(50);
+
+const socialAccountId = z
+  .string()
+  .regex(SOCIAL_ACCOUNT_ID_PATTERN, "must match GHL social account ID format");
+
+const socialAccountIds = z.array(socialAccountId).min(1).max(10);
+
+// A regex rather than a .refine: zod renders `pattern` into the derived JSON
+// Schema, so the caller can see the rule. Refinements are dropped silently.
+const mediaItem = z.object({
+  url: z
+    .string()
+    .max(MAX_MEDIA_URL_LENGTH)
+    .regex(/^https:\/\//, "media url must start with https://"),
+  caption: limitedString(2200).optional(),
+  altText: limitedString(420).optional(),
+});
+
+const mediaList = z.array(mediaItem).min(1).max(MAX_MEDIA_ITEMS);
+const singleMedia = z.array(mediaItem).length(1);
+const socialSummary = limitedString(MAX_SUMMARY_LENGTH);
+const authorableStatus = z.enum(AUTHORABLE_POST_STATUSES);
+const followUpComment = limitedString(2200);
 
 export const toolSchemas = {
   search_contacts: z.object({
@@ -238,6 +267,53 @@ export const toolSchemas = {
   }),
 
   list_social_accounts: z.object({}),
+
+  post_to_facebook: z.object({
+    accountIds: socialAccountIds,
+    status: authorableStatus,
+    summary: socialSummary,
+    media: mediaList.optional(),
+    followUpComment: followUpComment.optional(),
+  }),
+
+  post_to_instagram: z.object({
+    accountIds: socialAccountIds,
+    status: authorableStatus,
+    summary: socialSummary,
+    media: mediaList,
+    postType: z.enum(["post", "reel", "story"]),
+    followUpComment: followUpComment.optional(),
+  }),
+
+  post_to_youtube: z.object({
+    accountIds: socialAccountIds,
+    status: authorableStatus,
+    title: limitedString(MAX_YOUTUBE_TITLE_LENGTH),
+    summary: socialSummary.optional(),
+    media: singleMedia,
+    privacy: z.enum(["public", "unlisted", "private"]),
+  }),
+
+  post_to_linkedin: z.object({
+    accountIds: socialAccountIds,
+    status: authorableStatus,
+    summary: socialSummary,
+    media: mediaList.optional(),
+    postAsPdf: z.boolean().optional(),
+    pdfTitle: limitedString(256).optional(),
+    followUpComment: followUpComment.optional(),
+  }),
+
+  post_to_tiktok: z.object({
+    accountIds: socialAccountIds,
+    status: authorableStatus,
+    summary: socialSummary,
+    media: singleMedia,
+    privacyLevel: z.enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"]),
+    allowComments: z.boolean(),
+    allowDuet: z.boolean(),
+    allowStitch: z.boolean(),
+  }),
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;

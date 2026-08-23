@@ -107,8 +107,12 @@ export interface SocialAccount {
 
 export interface MediaItem {
   url: string;
-  caption?: string;
-  altText?: string;
+  // Explicit `| undefined` because these values arrive straight from a Zod
+  // schema, whose optional properties are typed `string | undefined`, and
+  // exactOptionalPropertyTypes rejects that against a bare `caption?: string`.
+  // Harmless on the wire: JSON.stringify omits undefined-valued keys.
+  caption?: string | undefined;
+  altText?: string | undefined;
 }
 
 export interface SocialPost {
