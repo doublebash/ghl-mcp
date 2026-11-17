@@ -18,6 +18,7 @@ import {
   MIN_CONVERSATION_LIMIT,
   OPPORTUNITY_STATUSES,
 } from "../constants.js";
+import { STATS_PLATFORMS } from "../ghl/statistics.js";
 
 const ghlId = z.string().regex(GHL_ID_PATTERN, "must match GHL ID format");
 
@@ -355,6 +356,23 @@ export const toolSchemas = {
   delete_social_post: z.object({
     postId: ghlId,
   }),
+
+  get_social_stats: z
+    .object({
+      fromDate: isoDateTime.optional(),
+      toDate: isoDateTime.optional(),
+      compareToPrevious: z.boolean().default(true),
+      platforms: z.array(z.enum(STATS_PLATFORMS)).min(1).max(STATS_PLATFORMS.length).optional(),
+      accountIds: socialAccountIds.optional(),
+      includeSeries: z.boolean().optional(),
+    })
+    .refine((v) => (v.fromDate === undefined) === (v.toDate === undefined), {
+      message: "give both fromDate and toDate, or neither for the last 7 days",
+    })
+    .refine(
+      (v) => v.fromDate === undefined || v.toDate === undefined || Date.parse(v.fromDate) < Date.parse(v.toDate),
+      { message: "fromDate must be before toDate" },
+    ),
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;

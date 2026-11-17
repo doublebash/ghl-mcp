@@ -43,6 +43,7 @@ const expectedTools: ToolName[] = [
   "get_social_post",
   "update_social_post",
   "delete_social_post",
+  "get_social_stats",
 ];
 
 describe("server metadata", () => {
@@ -54,7 +55,7 @@ describe("server metadata", () => {
 });
 
 describe("tool catalogue", () => {
-  it("declares the expected 37 tools", () => {
+  it("declares the expected 38 tools", () => {
     expect(toolDefinitions.length).toBe(expectedTools.length);
     const names = toolDefinitions.map((t) => t.name);
     for (const name of expectedTools) {
@@ -332,5 +333,30 @@ describe("social lifecycle schemas", () => {
   it("rejects a post id carrying path traversal", () => {
     expect(toolSchemas.get_social_post.safeParse({ postId: "../accounts" }).success).toBe(false);
     expect(toolSchemas.delete_social_post.safeParse({ postId: "../accounts" }).success).toBe(false);
+  });
+});
+
+describe("get_social_stats schema", () => {
+  it("accepts no dates, for GHL's 7-day default", () => {
+    expect(toolSchemas.get_social_stats.safeParse({}).success).toBe(true);
+  });
+
+  it("defaults compareToPrevious to true", () => {
+    const parsed = toolSchemas.get_social_stats.parse({});
+    expect(parsed.compareToPrevious).toBe(true);
+  });
+
+  it("rejects a single date, which would leave the range half-defined", () => {
+    expect(toolSchemas.get_social_stats.safeParse({ fromDate: "2026-01-01" }).success).toBe(false);
+    expect(toolSchemas.get_social_stats.safeParse({ toDate: "2026-01-01" }).success).toBe(false);
+  });
+
+  it("rejects a range that ends before it starts", () => {
+    const result = toolSchemas.get_social_stats.safeParse({ fromDate: "2026-02-01", toDate: "2026-01-01" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a platform GHL statistics does not report", () => {
+    expect(toolSchemas.get_social_stats.safeParse({ platforms: ["twitter"] }).success).toBe(false);
   });
 });

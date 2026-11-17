@@ -1,6 +1,6 @@
 export const SERVER_NAME = "ghl-mcp";
 // Keep in lockstep with package.json — tests/mcp/schemas.test.ts asserts they match.
-export const SERVER_VERSION = "2.6.0";
+export const SERVER_VERSION = "2.7.0";
 
 export const GHL_BASE_URL = "https://services.leadconnectorhq.com";
 export const GHL_API_VERSION = "2021-07-28";

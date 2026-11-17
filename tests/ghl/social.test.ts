@@ -107,6 +107,19 @@ describe("listSocialAccounts", () => {
     expect((await listSocialAccounts(env)).map((a) => a.id)).toEqual(["fb-2"]);
   });
 
+  it("carries a well-formed profileId through and drops a malformed one", async () => {
+    const env = {
+      ...TEST_ENV,
+      GHL_SOCIAL_ACCOUNTS: JSON.stringify([
+        { id: "fb-1", platform: "facebook", profileId: "0123456789abcdef01234567" },
+        { id: "ig-1", platform: "instagram", profileId: "not-an-object-id" },
+      ]),
+    };
+    const accounts = await listSocialAccounts(env);
+    expect(accounts[0]?.profileId).toBe("0123456789abcdef01234567");
+    expect(accounts[1]).not.toHaveProperty("profileId");
+  });
+
   it("reports a configuration problem when the secret is unparseable", async () => {
     const err = await listSocialAccounts({ ...TEST_ENV, GHL_SOCIAL_ACCOUNTS: "not json" }).catch(
       (e: unknown) => e,

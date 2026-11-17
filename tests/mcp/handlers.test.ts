@@ -374,10 +374,10 @@ describe("social lifecycle tools", () => {
 });
 
 describe("catalogue completeness", () => {
-  it("declares 37 tools, every one with a handler", () => {
+  it("declares 38 tools, every one with a handler", () => {
     // defineTools builds dispatch from the same map as the catalogue, so a
     // schema without a handler fails the build rather than surfacing at runtime.
-    expect(Object.keys(toolSchemas)).toHaveLength(37);
+    expect(Object.keys(toolSchemas)).toHaveLength(38);
   });
 
   it("rejects a social tool name that does not exist", async () => {

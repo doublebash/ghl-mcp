@@ -103,6 +103,12 @@ export interface SocialAccount {
   /** False for platforms connected in GHL that this server has no posting tool for. */
   supported: boolean;
   name?: string;
+  /**
+   * The 24-character id the statistics endpoint wants. Not derivable from `id`:
+   * it lives only in GHL's accounts listing, which this token cannot read, so it
+   * comes from config alongside the rest. Absent means no statistics for this account.
+   */
+  profileId?: string;
 }
 
 export interface MediaItem {

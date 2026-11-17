@@ -62,7 +62,10 @@ interface RawAccount {
   _id?: unknown;
   platform?: unknown;
   name?: unknown;
+  profileId?: unknown;
 }
+
+const PROFILE_ID_PATTERN = /^[a-f0-9]{24}$/;
 
 function normaliseAccount(raw: RawAccount): SocialAccount | null {
   const id = typeof raw.id === "string" ? raw.id : typeof raw._id === "string" ? raw._id : "";
@@ -73,6 +76,11 @@ function normaliseAccount(raw: RawAccount): SocialAccount | null {
     platform,
     supported: (SOCIAL_PLATFORMS as readonly string[]).includes(platform),
     ...(typeof raw.name === "string" ? { name: raw.name } : {}),
+    // Silently dropped when malformed: a bad profileId should cost that account
+    // its statistics, not break posting for every account.
+    ...(typeof raw.profileId === "string" && PROFILE_ID_PATTERN.test(raw.profileId)
+      ? { profileId: raw.profileId }
+      : {}),
   };
 }
 

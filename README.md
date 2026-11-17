@@ -2,13 +2,13 @@
 
 A hardened **Model Context Protocol** server bridging Claude to **GoHighLevel CRM**, deployed on **Cloudflare Workers**.
 
-Fork this repo, deploy to your own Cloudflare account, point Claude.ai at your worker, and Claude can read and write your GoHighLevel data through 37 typed tools — CRM (contacts, opportunities, conversations, appointments, workflows, tags, tasks, notes) plus social posting to Facebook, Instagram, YouTube, LinkedIn and TikTok via the Social Planner.
+Fork this repo, deploy to your own Cloudflare account, point Claude.ai at your worker, and Claude can read and write your GoHighLevel data through 38 typed tools — CRM (contacts, opportunities, conversations, appointments, workflows, tags, tasks, notes) plus social posting to Facebook, Instagram, YouTube, LinkedIn and TikTok, and social statistics, via the Social Planner.
 
 Built on [`@bashco/mcp-toolkit`](https://github.com/doublebash/mcp-toolkit) — OAuth, per-client bearer tokens, rate limiting, structured logging, and typed tool dispatch are all handled by the shared library.
 
 ## What you get
 
-- **37 GHL tools** — 26 CRM (contacts, opportunities, pipelines, conversations, appointments, workflows, tags, tasks, notes) and 11 social posting. Full live catalogue at the `tools/list` MCP endpoint after deploy.
+- **38 GHL tools** — 26 CRM (contacts, opportunities, pipelines, conversations, appointments, workflows, tags, tasks, notes), 11 social posting and 1 social statistics. Full live catalogue at the `tools/list` MCP endpoint after deploy.
 - **OAuth 2.0 + PKCE** authentication for Claude.ai
 - **Per-client bearer tokens** — each Claude connection gets a unique token; compromise of one affects only that client
 - **Cloudflare rate limiting** on `/approve`, `/token`, `/register`, `/mcp`
@@ -78,7 +78,7 @@ wrangler secret put GHL_CALENDAR_ID        # default calendar for appointment to
 | `GHL_API_TOKEN`       | GoHighLevel API token (location-scoped, least-privilege). |
 | `GHL_LOCATION_ID`     | GoHighLevel location ID. |
 | `GHL_USER_ID`         | Default "assigned to" user. |
-| `GHL_SOCIAL_ACCOUNTS` | JSON array of the social accounts connected in your Social Planner, e.g. `[{"id":"abc","platform":"facebook","name":"My Page"}]`. Only needed for the social posting tools — see below. |
+| `GHL_SOCIAL_ACCOUNTS` | JSON array of the social accounts connected in your Social Planner, e.g. `[{"id":"abc","platform":"facebook","name":"My Page","profileId":"0123456789abcdef01234567"}]`. Only needed for the social tools — see below. |
 | `GHL_CALENDAR_ID`     | Default calendar for `add_appointment`. |
 
 ### 4. Deploy
@@ -95,13 +95,13 @@ Wrangler prints your worker URL — something like `https://ghl-mcp.<your-accoun
 2. Server URL: `https://ghl-mcp.<your-account>.workers.dev/mcp`
 3. Claude.ai redirects you to your worker's `/authorize` page
 4. Paste your `MCP_APPROVAL_CODE` and confirm
-5. You're connected — Claude now has the 37 GHL tools available
+5. You're connected — Claude now has the 38 GHL tools available
 
 The approval-code step happens **once per Claude.ai client**. Subsequent requests use the per-client bearer issued during this flow.
 
 ## Social posting
 
-Eleven of the 37 tools post to the accounts connected in your GoHighLevel **Social Planner**.
+Eleven of the 38 tools post to the accounts connected in your GoHighLevel **Social Planner**.
 
 - `list_social_accounts` — run first; the posting tools need explicit account IDs
 - `post_to_facebook`, `post_to_instagram`, `post_to_youtube`, `post_to_linkedin`, `post_to_tiktok`
@@ -158,6 +158,26 @@ with a session token, which is not scope-limited the way a private integration t
 
 Get the `platform` values right — they drive the guard that stops a LinkedIn account ID being
 used for a YouTube post.
+
+## Social statistics
+
+`get_social_stats` reports account-level performance from the Social Planner's statistics:
+posts, impressions, reach, likes, comments, shares and followers gained, as totals and per
+platform, for any period (years back included), optionally compared with the period before and
+broken into a time series. It counts posts made directly on the platforms too, not only ones
+scheduled through GoHighLevel. There is no per-post breakdown: GoHighLevel's statistics API
+returns totals only.
+
+**Setup.**
+
+1. Add the `socialplanner/statistics.readonly` scope to your private integration.
+2. Add each account's `profileId` to its `GHL_SOCIAL_ACCOUNTS` entry. This is a 24-character id
+   that is **not** part of the account `id`; it appears only in the Social Planner's accounts
+   response (the same `/accounts` request described above). In that response it is the
+   `profileId` field of each account. Accounts without one are left out of statistics and
+   listed under `accountsWithoutStats`.
+
+TikTok only reports statistics for Business accounts.
 
 ## Local development
 

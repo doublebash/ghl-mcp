@@ -258,4 +258,19 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     "If the post has already been published, deleting it here may not remove it from the social " +
     "platform itself. " +
     "Run list_social_posts first to get the post ID and confirm you have the right post.",
+
+  get_social_stats:
+    "Get social media performance from GoHighLevel's Social Planner statistics: posts, impressions, " +
+    "reach, likes, comments, shares and newFollowers (followers GAINED in the period, not the total " +
+    "follower count), as overall totals and per platform. Covers every connected account that has " +
+    "statistics set up, including posts made directly on the platforms, not just ones scheduled in " +
+    "GoHighLevel. These are ACCOUNT-LEVEL totals: there is no per-post breakdown. " +
+    "fromDate and toDate are both optional; give both or neither. With neither you get the last 7 days. " +
+    "Any period works, years back included; GoHighLevel picks the grouping from the length (daily for " +
+    "a week, monthly for a year, yearly beyond). compareToPrevious (default true) adds changePercent " +
+    "against the equal-length period just before. Narrow with platforms, or with accountIds from " +
+    "list_social_accounts to separate two accounts on one platform (e.g. a LinkedIn page and profile). " +
+    "includeSeries adds the figures per time bucket for trends. Instagram audience age and gender " +
+    "come back as demographics. accountsWithoutStats lists accounts that could not be included — " +
+    "TikTok only reports for Business accounts.",
 };

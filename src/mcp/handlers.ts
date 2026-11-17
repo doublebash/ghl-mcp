@@ -35,6 +35,7 @@ import {
   schedulePost,
   updatePost,
 } from "../ghl/social.js";
+import { getSocialStats } from "../ghl/statistics.js";
 import {
   createOpportunity,
   getOpportunities,
@@ -306,4 +307,6 @@ export const HANDLERS: { [N in ToolName]: Handler<N> } = {
   update_social_post: (env, { postId, ...rest }) => updatePost(env, postId, compact(rest)),
 
   delete_social_post: (env, { postId }) => deletePost(env, postId),
+
+  get_social_stats: (env, args) => getSocialStats(env, args),
 };
